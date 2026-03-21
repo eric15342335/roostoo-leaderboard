@@ -16,6 +16,7 @@
  * @typedef {Object} OrderRow
  * @property {string} team
  * @property {number} rank
+ * @property {string} country
  * @property {string} coin
  * @property {string} pair
  * @property {string} side
@@ -29,6 +30,7 @@
  * @typedef {Object} CoinProfitRow
  * @property {string} team
  * @property {number} rank
+ * @property {string} country
  * @property {string} coin
  * @property {number} totalProfit
  * @property {number} coinLeft
@@ -37,12 +39,11 @@
  * @property {number} positionValueUsd
  */
 
-/** @param {string} name */
 function teamLabel(name) {
   return name.length <= 28 ? name : name.slice(0, 25) + "...";
 }
 
-/** @param {number} v raw profit from API (0.012 = 1.2%) */
+// raw profit: 0.012 = 1.2%
 function scaleProfitPct(v) {
   return Math.abs(v) < 10 ? v * 100 : v;
 }
@@ -52,11 +53,8 @@ function scaleProfitPct(v) {
  * @returns {{ lbRows: LbEntry[], orderRows: OrderRow[], coinRows: CoinProfitRow[], meta: any }}
  */
 export function transform({ compRaw, lbRaw, results }) {
-  /** @type {LbEntry[]} */
   const lbRows = [];
-  /** @type {OrderRow[]} */
   const orderRows = [];
-  /** @type {CoinProfitRow[]} */
   const coinRows = [];
 
   for (const { entry, portfolio, orders } of results) {
@@ -81,6 +79,7 @@ export function transform({ compRaw, lbRaw, results }) {
       orderRows.push({
         team,
         rank,
+        country,
         coin: o.Pair.split("/")[0],
         pair: o.Pair,
         side: o.Side,
@@ -108,6 +107,7 @@ export function transform({ compRaw, lbRaw, results }) {
       coinRows.push({
         team,
         rank,
+        country,
         coin: cp.Coin,
         totalProfit: cp.TotalProfit,
         coinLeft: cp.CoinLeft,
@@ -120,16 +120,19 @@ export function transform({ compRaw, lbRaw, results }) {
 
   lbRows.sort((a, b) => a.rank - b.rank);
 
+  const hkName = compRaw?.hk?.CptName ?? compRaw?.CptName ?? "HK Round 1";
+  const sgName = compRaw?.sg?.CptName ?? "SG Round 1";
   const meta = {
     scrapedAt: new Date().toISOString(),
-    competitionName: compRaw?.CptName ?? "Competition",
+    competitionName: hkName + " + " + sgName,
+    hkCompetitionName: hkName,
+    sgCompetitionName: sgName,
     participantCount: lbRows.length,
   };
 
   return { lbRows, orderRows, coinRows, meta };
 }
 
-/** @param {OrderRow[]} rows */
 export function topPairs(rows, n = 15) {
   /** @type {Map<string, {volume: number, count: number}>} */
   const m = new Map();
@@ -145,7 +148,6 @@ export function topPairs(rows, n = 15) {
     .slice(0, n);
 }
 
-/** @param {CoinProfitRow[]} rows */
 export function coinPnlAggregate(rows) {
   /** @type {Map<string, {netProfit: number, totalTraded: number, teamCount: number}>} */
   const m = new Map();
@@ -162,7 +164,6 @@ export function coinPnlAggregate(rows) {
     .sort((a, b) => b.netProfit - a.netProfit);
 }
 
-/** @param {OrderRow[]} rows */
 export function ordersByHour(rows) {
   /** @type {number[]} */
   const counts = new Array(24).fill(0);
@@ -170,10 +171,7 @@ export function ordersByHour(rows) {
   return counts.map((count, hour) => ({ hour, count })).filter((x) => x.count > 0);
 }
 
-/**
- * Build pivot: team × coin → totalProfit, returns top N coins by activity
- * @param {CoinProfitRow[]} rows
- */
+/** @param {CoinProfitRow[]} rows */
 export function heatmapPivot(rows, maxCoins = 20) {
   const teams = [...new Set(rows.map((r) => r.team))];
   const allCoins = [...new Set(rows.map((r) => r.coin))];
@@ -194,9 +192,12 @@ export function heatmapPivot(rows, maxCoins = 20) {
   return { teams, coins: topCoins, z };
 }
 
-/** @param {LbEntry[]} rows */
 export function summaryStats(rows, orderRows) {
   const sorted = [...rows].sort((a, b) => b.profitPct - a.profitPct);
+  const hkRows = rows.filter((r) => r.country === "HK");
+  const sgRows = rows.filter((r) => r.country === "SG");
+  const hkSorted = [...hkRows].sort((a, b) => b.profitPct - a.profitPct);
+  const sgSorted = [...sgRows].sort((a, b) => b.profitPct - a.profitPct);
   return {
     participantCount: rows.length,
     totalOrders: orderRows.length,
@@ -205,7 +206,93 @@ export function summaryStats(rows, orderRows) {
     avgProfitPct: rows.reduce((s, r) => s + r.profitPct, 0) / rows.length,
     bestTeam: sorted[0],
     worstTeam: sorted[sorted.length - 1],
-    hkCount: rows.filter((r) => r.country === "HK").length,
-    sgCount: rows.filter((r) => r.country === "SG").length,
+    hkCount: hkRows.length,
+    sgCount: sgRows.length,
+    hkAvgProfitPct: hkRows.length ? hkRows.reduce((s, r) => s + r.profitPct, 0) / hkRows.length : 0,
+    sgAvgProfitPct: sgRows.length ? sgRows.reduce((s, r) => s + r.profitPct, 0) / sgRows.length : 0,
+    hkBestTeam: hkSorted[0] ?? null,
+    sgBestTeam: sgSorted[0] ?? null,
+    hkTotalVolume: hkRows.reduce((s, r) => s + r.tradeVolume, 0),
+    sgTotalVolume: sgRows.reduce((s, r) => s + r.tradeVolume, 0),
   };
+}
+
+/** @param {LbEntry[]} lbRows */
+export function countryBreakdown(lbRows) {
+  const m = new Map();
+  for (const r of lbRows) {
+    if (!m.has(r.country)) m.set(r.country, { teams: [] });
+    m.get(r.country).teams.push(r);
+  }
+  return [...m.entries()].map(([country, { teams }]) => {
+    const sorted = [...teams].sort((a, b) => b.profitPct - a.profitPct);
+    return {
+      country,
+      count: teams.length,
+      avgProfitPct: teams.reduce((s, t) => s + t.profitPct, 0) / teams.length,
+      medianProfitPct: sorted[Math.floor(sorted.length / 2)]?.profitPct ?? 0,
+      bestProfitPct: sorted[0]?.profitPct ?? 0,
+      totalVolume: teams.reduce((s, t) => s + t.tradeVolume, 0),
+      avgVolume: teams.reduce((s, t) => s + t.tradeVolume, 0) / teams.length,
+      totalOrders: teams.reduce((s, t) => s + t.orderCount, 0),
+      avgOrders: teams.reduce((s, t) => s + t.orderCount, 0) / teams.length,
+      totalCommission: teams.reduce((s, t) => s + t.totalCommission, 0),
+      profitPcts: sorted.map((t) => t.profitPct),
+    };
+  });
+}
+
+/** @param {OrderRow[]} orderRows */
+export function ordersByHourByCountry(orderRows) {
+  const countries = [...new Set(orderRows.map((r) => r.country))].filter(Boolean);
+  const m = new Map(countries.map((c) => [c, new Array(24).fill(0)]));
+  for (const r of orderRows) {
+    if (r.country && m.has(r.country)) m.get(r.country)[r.hourUtc]++;
+  }
+  return Array.from({ length: 24 }, (_, hour) => {
+    const entry = { hour };
+    for (const [c, counts] of m) entry[c] = counts[hour];
+    return entry;
+  }).filter((e) => countries.some((c) => e[c] > 0));
+}
+
+/** @param {CoinProfitRow[]} coinRows */
+export function coinPnlByCountry(coinRows) {
+  const countries = [...new Set(coinRows.map((r) => r.country))].filter(Boolean);
+  const coins = [...new Set(coinRows.map((r) => r.coin))];
+  const m = new Map(coins.map((coin) => [coin, new Map(countries.map((c) => [c, 0]))]));
+  let totalByCountry = Object.fromEntries(countries.map((c) => [c, 0]));
+  for (const r of coinRows) {
+    if (r.country && m.has(r.coin))
+      m.get(r.coin).set(r.country, (m.get(r.coin).get(r.country) ?? 0) + r.totalProfit);
+    if (r.country)
+      totalByCountry[r.country] = (totalByCountry[r.country] ?? 0) + Math.abs(r.totalProfit);
+  }
+  const sorted = [...m.entries()]
+    .map(([coin, byCountry]) => ({
+      coin,
+      ...Object.fromEntries(byCountry),
+      total: [...byCountry.values()].reduce((s, v) => s + Math.abs(v), 0),
+    }))
+    .filter((e) => e.total > 0)
+    .sort((a, b) => b.total - a.total);
+  return { rows: sorted, countries };
+}
+
+/** @param {OrderRow[]} orderRows @param {number} [n] */
+export function topPairsByCountry(orderRows, n = 15) {
+  const countries = [...new Set(orderRows.map((r) => r.country))].filter(Boolean);
+  const m = new Map();
+  for (const r of orderRows) {
+    if (!m.has(r.pair)) m.set(r.pair, new Map(countries.map((c) => [c, 0])));
+    const byCountry = m.get(r.pair);
+    byCountry.set(r.country, (byCountry.get(r.country) ?? 0) + r.notionalUsd);
+  }
+  return [...m.entries()]
+    .map(([pair, byCountry]) => {
+      const total = [...byCountry.values()].reduce((s, v) => s + v, 0);
+      return { pair, total, ...Object.fromEntries(byCountry) };
+    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, n);
 }

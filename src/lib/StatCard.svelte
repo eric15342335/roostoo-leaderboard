@@ -12,12 +12,21 @@
   <div class="title">Competition Summary</div>
 
   <div class="row">
-    <span class="key">Competition</span>
+    <span class="key">HK Competition</span>
     <span
       class="val"
-      style="color:{BLUE}">{meta.competitionName.replace(/[^\x00-\x7F]/g, "").trim()}</span
+      style="color:{BLUE}">{meta.hkCompetitionName ?? meta.competitionName}</span
     >
   </div>
+  {#if meta.sgCompetitionName}
+    <div class="row">
+      <span class="key">SG Competition</span>
+      <span
+        class="val"
+        style="color:{GREEN}">{meta.sgCompetitionName}</span
+      >
+    </div>
+  {/if}
   <div class="row">
     <span class="key">Scraped at</span>
     <span class="val">{new Date(meta.scrapedAt).toUTCString()}</span>
@@ -80,6 +89,27 @@
       style="color:{BLUE}">{stats.hkCount}</span
     >
   </div>
+  {#if stats.hkBestTeam}
+    <div class="row">
+      <span class="key">HK Best Team</span>
+      <span
+        class="val"
+        style="color:{BLUE}"
+      >
+        {stats.hkBestTeam.team}
+        ({stats.hkBestTeam.profitPct >= 0 ? "+" : ""}{stats.hkBestTeam.profitPct.toFixed(4)}%)
+      </span>
+    </div>
+    <div class="row">
+      <span class="key">HK Avg P&amp;L</span>
+      <span
+        class="val"
+        style="color:{stats.hkAvgProfitPct >= 0 ? BLUE : RED}"
+      >
+        {stats.hkAvgProfitPct >= 0 ? "+" : ""}{stats.hkAvgProfitPct.toFixed(4)}%
+      </span>
+    </div>
+  {/if}
   <div class="row">
     <span class="key">SG Teams</span>
     <span
@@ -87,6 +117,27 @@
       style="color:{GREEN}">{stats.sgCount}</span
     >
   </div>
+  {#if stats.sgBestTeam}
+    <div class="row">
+      <span class="key">SG Best Team</span>
+      <span
+        class="val"
+        style="color:{GREEN}"
+      >
+        {stats.sgBestTeam.team}
+        ({stats.sgBestTeam.profitPct >= 0 ? "+" : ""}{stats.sgBestTeam.profitPct.toFixed(4)}%)
+      </span>
+    </div>
+    <div class="row">
+      <span class="key">SG Avg P&amp;L</span>
+      <span
+        class="val"
+        style="color:{stats.sgAvgProfitPct >= 0 ? GREEN : RED}"
+      >
+        {stats.sgAvgProfitPct >= 0 ? "+" : ""}{stats.sgAvgProfitPct.toFixed(4)}%
+      </span>
+    </div>
+  {/if}
   {#if stats.participantCount - stats.hkCount - stats.sgCount > 0}
     <div class="row">
       <span class="key">Other</span>

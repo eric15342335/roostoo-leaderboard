@@ -16,7 +16,7 @@
 <header>
   <div class="left">
     <h1>Quant Trading Hackathon</h1>
-    <span class="sub">Round 1 HK &mdash; Live Leaderboard</span>
+    <span class="sub">Round 1 HK &amp; SG &mdash; Live Leaderboard</span>
   </div>
   <div class="right">
     <span

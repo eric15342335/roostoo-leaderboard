@@ -8,7 +8,7 @@ export const RED = "#f85149";
 export const BLUE = "#58a6ff";
 export const ORANGE = "#d29922";
 export const PURPLE = "#bc8cff";
-export const CYAN = "#39d353";
+export const CYAN = "#79c0ff";
 
 export const COUNTRY_COLORS = { HK: BLUE, SG: GREEN };
 

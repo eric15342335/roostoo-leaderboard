@@ -5,6 +5,7 @@
   import StatCard from "$lib/StatCard.svelte";
   import PlotPanel from "$lib/PlotPanel.svelte";
   import LoadingScreen from "$lib/LoadingScreen.svelte";
+  import RegionFilter from "$lib/RegionFilter.svelte";
   import {
     chartLeaderboard,
     chartVolume,
@@ -16,9 +17,13 @@
     chartOrderSizeDist,
     chartCommission,
     chartActivityVsProfit,
+    chartHkVsSgOverview,
+    chartOrderTimingByCountry,
+    chartCoinPnlByCountry,
   } from "$lib/charts.js";
 
   let ready = $state(false);
+  let region = $state("ALL");
 
   onMount(() => {
     const hadStored = loadFromStorage();
@@ -29,6 +34,17 @@
   });
 
   let d = $derived(cache.data);
+
+  let filtered = $derived.by(() => {
+    if (!d) return null;
+    if (region === "ALL") return d;
+    return {
+      ...d,
+      lbRows: d.lbRows.filter((r) => r.country === region),
+      orderRows: d.orderRows.filter((r) => r.country === region),
+      coinRows: d.coinRows.filter((r) => r.country === region),
+    };
+  });
 </script>
 
 <svelte:head>
@@ -43,71 +59,102 @@
   <main>
     <div class="top-row">
       <div class="stats-col">
+        <RegionFilter
+          value={region}
+          onchange={(v) => (region = v)}
+        />
         <StatCard
-          lbRows={d.lbRows}
-          orderRows={d.orderRows}
-          meta={d.meta}
+          lbRows={filtered.lbRows}
+          orderRows={filtered.orderRows}
+          meta={filtered.meta}
         />
       </div>
       <PlotPanel
         chartFn={chartLeaderboard}
-        args={[d.lbRows]}
+        args={[filtered.lbRows]}
       />
     </div>
 
-    <div class="grid-2">
+    <div class="grid-1">
       <PlotPanel
         chartFn={chartVolume}
-        args={[d.lbRows]}
+        args={[filtered.lbRows]}
       />
+    </div>
+
+    <div class="grid-1">
       <PlotPanel
         chartFn={chartBuySell}
-        args={[d.lbRows]}
+        args={[filtered.lbRows]}
       />
     </div>
 
     <div class="grid-1">
       <PlotPanel
         chartFn={chartTopPairs}
-        args={[d.orderRows]}
+        args={[filtered.orderRows]}
       />
     </div>
 
     <div class="grid-1">
       <PlotPanel
         chartFn={chartCoinPnl}
-        args={[d.coinRows]}
+        args={[filtered.coinRows]}
       />
     </div>
 
     <div class="grid-1">
       <PlotPanel
         chartFn={chartHeatmap}
-        args={[d.coinRows]}
+        args={[filtered.coinRows]}
       />
     </div>
 
     <div class="grid-2">
       <PlotPanel
         chartFn={chartOrderTiming}
-        args={[d.orderRows]}
+        args={[filtered.orderRows]}
       />
       <PlotPanel
         chartFn={chartOrderSizeDist}
-        args={[d.orderRows]}
+        args={[filtered.orderRows]}
       />
     </div>
 
     <div class="grid-2">
       <PlotPanel
         chartFn={chartCommission}
-        args={[d.lbRows]}
+        args={[filtered.lbRows]}
       />
       <PlotPanel
         chartFn={chartActivityVsProfit}
-        args={[d.lbRows]}
+        args={[filtered.lbRows]}
       />
     </div>
+
+    {#if region === "ALL"}
+      <div class="section-divider">
+        <span>Hong Kong vs Singapore</span>
+      </div>
+
+      <div class="grid-1">
+        <PlotPanel
+          chartFn={chartHkVsSgOverview}
+          args={[filtered.lbRows]}
+        />
+      </div>
+
+      <div class="grid-2">
+        <PlotPanel
+          chartFn={chartOrderTimingByCountry}
+          args={[filtered.orderRows]}
+        />
+        <PlotPanel
+          chartFn={chartCoinPnlByCountry}
+          args={[filtered.coinRows]}
+        />
+      </div>
+    {/if}
   </main>
 {:else if cache.error}
   <div class="error-full">
@@ -134,7 +181,7 @@
     --blue: #58a6ff;
     --orange: #d29922;
     --purple: #bc8cff;
-    --cyan: #39d353;
+    --cyan: #79c0ff;
   }
 
   main {
@@ -166,6 +213,25 @@
   .grid-1 {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .section-divider::before,
+  .section-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
   }
 
   @media (max-width: 900px) {
