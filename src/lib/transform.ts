@@ -1,50 +1,47 @@
-/**
- * @typedef {Object} LbEntry
- * @property {number} rank
- * @property {string} team
- * @property {string} country
- * @property {number} profitPct
- * @property {number} currBal
- * @property {number} tradeVolume
- * @property {number} orderCount
- * @property {number} totalCommission
- * @property {number} buyCount
- * @property {number} sellCount
- */
+export interface LbEntry {
+  rank: number;
+  team: string;
+  country: string;
+  profitPct: number;
+  currBal: number;
+  tradeVolume: number;
+  orderCount: number;
+  totalCommission: number;
+  buyCount: number;
+  sellCount: number;
+}
 
-/**
- * @typedef {Object} OrderRow
- * @property {string} team
- * @property {number} rank
- * @property {string} country
- * @property {string} coin
- * @property {string} pair
- * @property {string} side
- * @property {number} notionalUsd
- * @property {number} commissionUsd
- * @property {number} createTsMs
- * @property {number} hourUtc
- */
+export interface OrderRow {
+  team: string;
+  rank: number;
+  country: string;
+  coin: string;
+  pair: string;
+  side: string;
+  notionalUsd: number;
+  commissionUsd: number;
+  createTsMs: number;
+  hourUtc: number;
+}
 
-/**
- * @typedef {Object} CoinProfitRow
- * @property {string} team
- * @property {number} rank
- * @property {string} country
- * @property {string} coin
- * @property {number} totalProfit
- * @property {number} coinLeft
- * @property {number} estimatedPrice
- * @property {number} totalTradeAmount
- * @property {number} positionValueUsd
- */
+export interface CoinProfitRow {
+  team: string;
+  rank: number;
+  country: string;
+  coin: string;
+  totalProfit: number;
+  coinLeft: number;
+  estimatedPrice: number;
+  totalTradeAmount: number;
+  positionValueUsd: number;
+}
 
-function teamLabel(name) {
+function teamLabel(name: string) {
   return name.length <= 28 ? name : name.slice(0, 25) + "...";
 }
 
 // raw profit: 0.012 = 1.2%
-function scaleProfitPct(v) {
+function scaleProfitPct(v: number) {
   return Math.abs(v) < 10 ? v * 100 : v;
 }
 
@@ -52,10 +49,10 @@ function scaleProfitPct(v) {
  * @param {{ compRaw: any, results: any[] }} raw
  * @returns {{ lbRows: LbEntry[], orderRows: OrderRow[], coinRows: CoinProfitRow[], meta: any }}
  */
-export function transform({ compRaw, results }) {
-  const lbRows = [];
-  const orderRows = [];
-  const coinRows = [];
+export function transform({ compRaw, results }: { compRaw: any; results: any[] }) {
+  const lbRows: LbEntry[] = [];
+  const orderRows: OrderRow[] = [];
+  const coinRows: CoinProfitRow[] = [];
 
   for (const { entry, portfolio, orders } of results) {
     const rank = entry.Rank;
@@ -133,9 +130,8 @@ export function transform({ compRaw, results }) {
   return { lbRows, orderRows, coinRows, meta };
 }
 
-export function topPairs(rows, n = 15) {
-  /** @type {Map<string, {volume: number, count: number}>} */
-  const m = new Map();
+export function topPairs(rows: OrderRow[], n = 15) {
+  const m = new Map<string, { volume: number; count: number }>();
   for (const r of rows) {
     const e = m.get(r.pair) ?? { volume: 0, count: 0 };
     e.volume += r.notionalUsd;
@@ -148,9 +144,8 @@ export function topPairs(rows, n = 15) {
     .slice(0, n);
 }
 
-export function coinPnlAggregate(rows) {
-  /** @type {Map<string, {netProfit: number, totalTraded: number, teamCount: number}>} */
-  const m = new Map();
+export function coinPnlAggregate(rows: CoinProfitRow[]) {
+  const m = new Map<string, { netProfit: number; totalTraded: number; teamCount: number }>();
   for (const r of rows) {
     const e = m.get(r.coin) ?? { netProfit: 0, totalTraded: 0, teamCount: 0 };
     e.netProfit += r.totalProfit;
@@ -164,15 +159,13 @@ export function coinPnlAggregate(rows) {
     .sort((a, b) => b.netProfit - a.netProfit);
 }
 
-export function ordersByHour(rows) {
-  /** @type {number[]} */
-  const counts = new Array(24).fill(0);
+export function ordersByHour(rows: OrderRow[]) {
+  const counts: number[] = new Array(24).fill(0);
   for (const r of rows) counts[r.hourUtc]++;
   return counts.map((count, hour) => ({ hour, count })).filter((x) => x.count > 0);
 }
 
-/** @param {CoinProfitRow[]} rows */
-export function heatmapPivot(rows, maxCoins = 20) {
+export function heatmapPivot(rows: CoinProfitRow[], maxCoins = 20) {
   const teams = [...new Set(rows.map((r) => r.team))];
   const allCoins = [...new Set(rows.map((r) => r.coin))];
 
@@ -192,7 +185,7 @@ export function heatmapPivot(rows, maxCoins = 20) {
   return { teams, coins: topCoins, z };
 }
 
-export function summaryStats(rows, orderRows) {
+export function summaryStats(rows: LbEntry[], orderRows: OrderRow[]) {
   const sorted = [...rows].sort((a, b) => b.profitPct - a.profitPct);
   const hkRows = rows.filter((r) => r.country === "HK");
   const sgRows = rows.filter((r) => r.country === "SG");
@@ -217,12 +210,11 @@ export function summaryStats(rows, orderRows) {
   };
 }
 
-/** @param {LbEntry[]} lbRows */
-export function countryBreakdown(lbRows) {
-  const m = new Map();
+export function countryBreakdown(lbRows: LbEntry[]) {
+  const m = new Map<string, { teams: LbEntry[] }>();
   for (const r of lbRows) {
     if (!m.has(r.country)) m.set(r.country, { teams: [] });
-    m.get(r.country).teams.push(r);
+    m.get(r.country)!.teams.push(r);
   }
   return [...m.entries()].map(([country, { teams }]) => {
     const sorted = [...teams].sort((a, b) => b.profitPct - a.profitPct);
@@ -242,29 +234,32 @@ export function countryBreakdown(lbRows) {
   });
 }
 
-/** @param {OrderRow[]} orderRows */
-export function ordersByHourByCountry(orderRows) {
+export function ordersByHourByCountry(
+  orderRows: OrderRow[]
+): Array<{ hour: number; [k: string]: number }> {
   const countries = [...new Set(orderRows.map((r) => r.country))].filter(Boolean);
-  const m = new Map(countries.map((c) => [c, new Array(24).fill(0)]));
+  const m = new Map(countries.map((c) => [c, new Array(24).fill(0) as number[]]));
   for (const r of orderRows) {
-    if (r.country && m.has(r.country)) m.get(r.country)[r.hourUtc]++;
+    const arr = r.country ? m.get(r.country) : undefined;
+    if (arr) arr[r.hourUtc]++;
   }
   return Array.from({ length: 24 }, (_, hour) => {
-    const entry = { hour };
+    const entry: { hour: number; [k: string]: number } = { hour };
     for (const [c, counts] of m) entry[c] = counts[hour];
     return entry;
   }).filter((e) => countries.some((c) => e[c] > 0));
 }
 
-/** @param {CoinProfitRow[]} coinRows */
-export function coinPnlByCountry(coinRows) {
+export function coinPnlByCountry(coinRows: CoinProfitRow[]) {
   const countries = [...new Set(coinRows.map((r) => r.country))].filter(Boolean);
   const coins = [...new Set(coinRows.map((r) => r.coin))];
   const m = new Map(coins.map((coin) => [coin, new Map(countries.map((c) => [c, 0]))]));
-  let totalByCountry = Object.fromEntries(countries.map((c) => [c, 0]));
+  const totalByCountry: Record<string, number> = Object.fromEntries(countries.map((c) => [c, 0]));
   for (const r of coinRows) {
-    if (r.country && m.has(r.coin))
-      m.get(r.coin).set(r.country, (m.get(r.coin).get(r.country) ?? 0) + r.totalProfit);
+    if (r.country && m.has(r.coin)) {
+      const coinMap = m.get(r.coin);
+      if (coinMap) coinMap.set(r.country, (coinMap.get(r.country) ?? 0) + r.totalProfit);
+    }
     if (r.country)
       totalByCountry[r.country] = (totalByCountry[r.country] ?? 0) + Math.abs(r.totalProfit);
   }
@@ -279,13 +274,12 @@ export function coinPnlByCountry(coinRows) {
   return { rows: sorted, countries };
 }
 
-/** @param {OrderRow[]} orderRows @param {number} [n] */
-export function topPairsByCountry(orderRows, n = 15) {
+export function topPairsByCountry(orderRows: OrderRow[], n = 15) {
   const countries = [...new Set(orderRows.map((r) => r.country))].filter(Boolean);
-  const m = new Map();
+  const m = new Map<string, Map<string, number>>();
   for (const r of orderRows) {
     if (!m.has(r.pair)) m.set(r.pair, new Map(countries.map((c) => [c, 0])));
-    const byCountry = m.get(r.pair);
+    const byCountry = m.get(r.pair)!;
     byCountry.set(r.country, (byCountry.get(r.country) ?? 0) + r.notionalUsd);
   }
   return [...m.entries()]

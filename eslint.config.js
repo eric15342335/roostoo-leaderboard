@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import svelte from "eslint-plugin-svelte";
 import globals from "globals";
+import tseslint from "typescript-eslint";
 import svelteConfig from "./svelte.config.js";
 
 /** @type {import('eslint').Linter.Config[]} */
@@ -18,17 +19,19 @@ export default [
     },
   },
 
-  // *.svelte.js files (e.g. cache.svelte.js) use Svelte 5 runes and must be
-  // parsed by svelte-eslint-parser, not the default JS parser.
+  // *.svelte and *.svelte.{js,ts} files must be parsed by svelte-eslint-parser.
+  // Use the TypeScript parser as the inner parser so <script lang="ts"> works.
   {
-    files: ["**/*.svelte", "**/*.svelte.js"],
+    files: ["**/*.svelte", "**/*.svelte.js", "**/*.svelte.ts"],
     languageOptions: {
       parserOptions: {
+        parser: tseslint.parser,
         svelteConfig,
       },
     },
   },
 
+  // Global rules (apply to all files)
   {
     rules: {
       "svelte/no-target-blank": "error",
@@ -50,6 +53,51 @@ export default [
     },
   },
 
+  // TypeScript files: use the TypeScript parser and TS-aware rules.
+  // Must come after the global rules block so these overrides take effect.
+  {
+    files: ["**/*.ts", "**/*.svelte.ts"],
+    plugins: { "@typescript-eslint": tseslint.plugin },
+    languageOptions: {
+      parser: tseslint.parser,
+      // Svelte 5 runes used in *.svelte.ts reactive modules
+      globals: {
+        $state: "readonly",
+        $derived: "readonly",
+        $effect: "readonly",
+        $props: "readonly",
+        $bindable: "readonly",
+        $inspect: "readonly",
+      },
+    },
+    rules: {
+      // TypeScript handles undefined-variable checking; no-undef produces false
+      // positives on types and ambient declarations.
+      "no-undef": "off",
+      // Swap out the JS rule for the TypeScript-aware version so that
+      // parameter names in function types are not flagged as unused.
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+
+  // For Svelte components with <script lang="ts">, also swap to the TS-aware
+  // no-unused-vars so function-type parameter names aren't flagged.
+  {
+    files: ["**/*.svelte"],
+    plugins: { "@typescript-eslint": tseslint.plugin },
+    rules: {
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+
   {
     ignores: [
       "build/**",
@@ -58,6 +106,7 @@ export default [
       "python/**",
       "*.min.js",
       "commit.txt",
+      "**/*.d.ts",
     ],
   },
 ];

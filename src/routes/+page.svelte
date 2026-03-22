@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
   import { cache, refresh, loadFromStorage, isStale } from "$lib/cache.svelte.js";
   import Header from "$lib/Header.svelte";
@@ -54,108 +54,110 @@
 {#if !ready || (!d && cache.loading)}
   <LoadingScreen />
 {:else if d}
-  <Header />
+  {#if filtered}
+    <Header />
 
-  <main>
-    <div class="top-row">
-      <div class="stats-col">
-        <RegionFilter
-          value={region}
-          onchange={(v) => (region = v)}
+    <main>
+      <div class="top-row">
+        <div class="stats-col">
+          <RegionFilter
+            value={region}
+            onchange={(v) => (region = v)}
+          />
+          <StatCard
+            lbRows={filtered.lbRows}
+            orderRows={filtered.orderRows}
+            meta={filtered.meta}
+          />
+        </div>
+        <PlotPanel
+          chartFn={chartLeaderboard}
+          args={[filtered.lbRows]}
         />
-        <StatCard
-          lbRows={filtered.lbRows}
-          orderRows={filtered.orderRows}
-          meta={filtered.meta}
-        />
-      </div>
-      <PlotPanel
-        chartFn={chartLeaderboard}
-        args={[filtered.lbRows]}
-      />
-    </div>
-
-    <div class="grid-1">
-      <PlotPanel
-        chartFn={chartVolume}
-        args={[filtered.lbRows]}
-      />
-    </div>
-
-    <div class="grid-1">
-      <PlotPanel
-        chartFn={chartBuySell}
-        args={[filtered.lbRows]}
-      />
-    </div>
-
-    <div class="grid-1">
-      <PlotPanel
-        chartFn={chartTopPairs}
-        args={[filtered.orderRows]}
-      />
-    </div>
-
-    <div class="grid-1">
-      <PlotPanel
-        chartFn={chartCoinPnl}
-        args={[filtered.coinRows]}
-      />
-    </div>
-
-    <div class="grid-1">
-      <PlotPanel
-        chartFn={chartHeatmap}
-        args={[filtered.coinRows]}
-      />
-    </div>
-
-    <div class="grid-2">
-      <PlotPanel
-        chartFn={chartOrderTiming}
-        args={[filtered.orderRows]}
-      />
-      <PlotPanel
-        chartFn={chartOrderSizeDist}
-        args={[filtered.orderRows]}
-      />
-    </div>
-
-    <div class="grid-2">
-      <PlotPanel
-        chartFn={chartCommission}
-        args={[filtered.lbRows]}
-      />
-      <PlotPanel
-        chartFn={chartActivityVsProfit}
-        args={[filtered.lbRows]}
-      />
-    </div>
-
-    {#if region === "ALL"}
-      <div class="section-divider">
-        <span>Hong Kong vs Singapore</span>
       </div>
 
       <div class="grid-1">
         <PlotPanel
-          chartFn={chartHkVsSgOverview}
+          chartFn={chartVolume}
           args={[filtered.lbRows]}
+        />
+      </div>
+
+      <div class="grid-1">
+        <PlotPanel
+          chartFn={chartBuySell}
+          args={[filtered.lbRows]}
+        />
+      </div>
+
+      <div class="grid-1">
+        <PlotPanel
+          chartFn={chartTopPairs}
+          args={[filtered.orderRows]}
+        />
+      </div>
+
+      <div class="grid-1">
+        <PlotPanel
+          chartFn={chartCoinPnl}
+          args={[filtered.coinRows]}
+        />
+      </div>
+
+      <div class="grid-1">
+        <PlotPanel
+          chartFn={chartHeatmap}
+          args={[filtered.coinRows]}
         />
       </div>
 
       <div class="grid-2">
         <PlotPanel
-          chartFn={chartOrderTimingByCountry}
+          chartFn={chartOrderTiming}
           args={[filtered.orderRows]}
         />
         <PlotPanel
-          chartFn={chartCoinPnlByCountry}
-          args={[filtered.coinRows]}
+          chartFn={chartOrderSizeDist}
+          args={[filtered.orderRows]}
         />
       </div>
-    {/if}
-  </main>
+
+      <div class="grid-2">
+        <PlotPanel
+          chartFn={chartCommission}
+          args={[filtered.lbRows]}
+        />
+        <PlotPanel
+          chartFn={chartActivityVsProfit}
+          args={[filtered.lbRows]}
+        />
+      </div>
+
+      {#if region === "ALL"}
+        <div class="section-divider">
+          <span>Hong Kong vs Singapore</span>
+        </div>
+
+        <div class="grid-1">
+          <PlotPanel
+            chartFn={chartHkVsSgOverview}
+            args={[filtered.lbRows]}
+          />
+        </div>
+
+        <div class="grid-2">
+          <PlotPanel
+            chartFn={chartOrderTimingByCountry}
+            args={[filtered.orderRows]}
+          />
+          <PlotPanel
+            chartFn={chartCoinPnlByCountry}
+            args={[filtered.coinRows]}
+          />
+        </div>
+      {/if}
+    </main>
+  {/if}
 {:else if cache.error}
   <div class="error-full">
     <div class="error-box">

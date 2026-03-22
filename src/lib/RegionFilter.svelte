@@ -1,8 +1,7 @@
-<script>
+<script lang="ts">
   import { BLUE, GREEN, MUTED } from "$lib/theme.js";
 
-  /** @type {{ value: string, onchange: (v: string) => void }} */
-  let { value, onchange } = $props();
+  let { value, onchange }: { value: string; onchange: (v: string) => void } = $props();
 
   const options = [
     { key: "ALL", label: "All" },
@@ -10,7 +9,7 @@
     { key: "SG", label: "SG" },
   ];
 
-  const activeColor = { ALL: MUTED, HK: BLUE, SG: GREEN };
+  const activeColor: Record<string, string> = { ALL: MUTED, HK: BLUE, SG: GREEN };
 </script>
 
 <div class="filter">

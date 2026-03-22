@@ -1,17 +1,17 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
 
-  /**
-   * @type {{
-   *   chartFn: (el: HTMLElement, ...args: any[]) => Promise<any>,
-   *   args: any[],
-   *   title?: string
-   * }}
-   */
-  let { chartFn, args, title: _title = "" } = $props();
+  let {
+    chartFn,
+    args,
+    title: _title = "",
+  }: {
+    chartFn: (el: HTMLElement, ...args: any[]) => Promise<any>;
+    args: any[];
+    title?: string;
+  } = $props();
 
-  /** @type {HTMLDivElement} */
-  let el;
+  let el: HTMLDivElement;
   let error = $state("");
 
   async function draw() {
@@ -52,6 +52,10 @@
   }
   .plot {
     width: 100%;
+    line-height: 0;
+  }
+  .plot :global(svg) {
+    display: block;
   }
   .err {
     color: var(--red);

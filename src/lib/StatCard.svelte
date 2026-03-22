@@ -1,9 +1,9 @@
-<script>
+<script lang="ts">
   import { GREEN, RED, BLUE, ORANGE, PURPLE } from "$lib/theme.js";
-  import { summaryStats } from "$lib/transform.js";
+  import { summaryStats, type LbEntry, type OrderRow } from "$lib/transform.js";
 
-  /** @type {{ lbRows: import('$lib/transform.js').LbEntry[], orderRows: import('$lib/transform.js').OrderRow[], meta: any }} */
-  let { lbRows, orderRows, meta } = $props();
+  let { lbRows, orderRows, meta }: { lbRows: LbEntry[]; orderRows: OrderRow[]; meta: any } =
+    $props();
 
   let stats = $derived(summaryStats(lbRows, orderRows));
 </script>

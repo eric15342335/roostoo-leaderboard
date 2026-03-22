@@ -26,8 +26,7 @@ function readStorage() {
   }
 }
 
-/** @param {ReturnType<typeof transform>} data */
-function writeStorage(data) {
+function writeStorage(data: ReturnType<typeof transform>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ data, ts: Date.now() }));
   } catch {
@@ -35,8 +34,14 @@ function writeStorage(data) {
   }
 }
 
-/** @type {{ data: ReturnType<typeof transform> | null, fetchedAt: number, loading: boolean, progress: number, progressTotal: number, error: string | null }} */
-export const cache = $state({
+export const cache = $state<{
+  data: ReturnType<typeof transform> | null;
+  fetchedAt: number;
+  loading: boolean;
+  progress: number;
+  progressTotal: number;
+  error: string | null;
+}>({
   data: null,
   fetchedAt: 0,
   loading: false,

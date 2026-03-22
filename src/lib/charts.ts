@@ -13,19 +13,25 @@ import {
   xaxis,
   yaxis,
 } from "./theme.js";
-import { topPairs, coinPnlAggregate, ordersByHour, heatmapPivot } from "./transform.js";
+import {
+  topPairs,
+  coinPnlAggregate,
+  ordersByHour,
+  heatmapPivot,
+  type LbEntry,
+  type OrderRow,
+  type CoinProfitRow,
+} from "./transform.js";
 
 const cfg = { displayModeBar: true, displaylogo: false, responsive: true };
 
-/** @param {HTMLElement} el @param {any[]} traces @param {any} layout */
-async function plot(el, traces, layout) {
+async function plot(el: HTMLElement, traces: any[], layout: any) {
   const Plotly = (await import("./plotly-custom.js")).default;
-  Plotly.react(el, traces, { ...LAYOUT_BASE, ...layout }, cfg);
+  (Plotly as any).react(el, traces, { ...LAYOUT_BASE, ...layout }, cfg);
   return Plotly;
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').LbEntry[]} rows */
-export async function chartLeaderboard(el, rows) {
+export async function chartLeaderboard(el: HTMLElement, rows: LbEntry[]) {
   const sorted = [...rows].sort((a, b) => a.profitPct - b.profitPct);
   const vals = sorted.map((r) => r.profitPct);
   const height = Math.max(480, rows.length * 22 + 110);
@@ -64,8 +70,7 @@ export async function chartLeaderboard(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').LbEntry[]} rows */
-export async function chartVolume(el, rows) {
+export async function chartVolume(el: HTMLElement, rows: LbEntry[]) {
   const sorted = [...rows].sort((a, b) => a.tradeVolume - b.tradeVolume);
   const height = Math.max(480, rows.length * 22 + 110);
   return plot(
@@ -108,8 +113,7 @@ export async function chartVolume(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').LbEntry[]} rows */
-export async function chartBuySell(el, rows) {
+export async function chartBuySell(el: HTMLElement, rows: LbEntry[]) {
   const sorted = [...rows].sort((a, b) => b.buyCount + b.sellCount - (a.buyCount + a.sellCount));
   const height = Math.max(480, rows.length * 22 + 110);
   return plot(
@@ -146,8 +150,7 @@ export async function chartBuySell(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').OrderRow[]} rows */
-export async function chartTopPairs(el, rows) {
+export async function chartTopPairs(el: HTMLElement, rows: OrderRow[]) {
   const pairs = topPairs(rows, 15);
   return plot(
     el,
@@ -190,8 +193,7 @@ export async function chartTopPairs(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').CoinProfitRow[]} rows */
-export async function chartCoinPnl(el, rows) {
+export async function chartCoinPnl(el: HTMLElement, rows: CoinProfitRow[]) {
   const agg = coinPnlAggregate(rows);
   const profits = agg.map((a) => a.netProfit);
   return plot(
@@ -228,8 +230,7 @@ export async function chartCoinPnl(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').CoinProfitRow[]} rows */
-export async function chartHeatmap(el, rows) {
+export async function chartHeatmap(el: HTMLElement, rows: CoinProfitRow[]) {
   const { teams, coins, z } = heatmapPivot(rows, 20);
   const maxAbs = Math.max(...z.flat().map(Math.abs), 1);
   return plot(
@@ -270,8 +271,7 @@ export async function chartHeatmap(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').OrderRow[]} rows */
-export async function chartOrderTiming(el, rows) {
+export async function chartOrderTiming(el: HTMLElement, rows: OrderRow[]) {
   const byHour = ordersByHour(rows);
   const counts = byHour.map((h) => h.count);
   return plot(
@@ -303,8 +303,7 @@ export async function chartOrderTiming(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').OrderRow[]} rows */
-export async function chartOrderSizeDist(el, rows) {
+export async function chartOrderSizeDist(el: HTMLElement, rows: OrderRow[]) {
   return plot(
     el,
     [
@@ -326,8 +325,7 @@ export async function chartOrderSizeDist(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').LbEntry[]} rows */
-export async function chartCommission(el, rows) {
+export async function chartCommission(el: HTMLElement, rows: LbEntry[]) {
   const sorted = [...rows].sort((a, b) => a.rank - b.rank);
   return plot(
     el,
@@ -369,8 +367,7 @@ export async function chartCommission(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').LbEntry[]} rows */
-export async function chartActivityVsProfit(el, rows) {
+export async function chartActivityVsProfit(el: HTMLElement, rows: LbEntry[]) {
   const sorted = [...rows].sort((a, b) => a.rank - b.rank);
   const maxVol = Math.max(...sorted.map((r) => r.tradeVolume));
   return plot(
@@ -409,8 +406,7 @@ export async function chartActivityVsProfit(el, rows) {
   );
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').LbEntry[]} lbRows */
-export async function chartHkVsSgOverview(el, lbRows) {
+export async function chartHkVsSgOverview(el: HTMLElement, lbRows: LbEntry[]) {
   const { countryBreakdown } = await import("./transform.js");
   const breakdown = countryBreakdown(lbRows).filter(
     (d) => d.country === "HK" || d.country === "SG"
@@ -472,12 +468,11 @@ export async function chartHkVsSgOverview(el, lbRows) {
   });
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').OrderRow[]} orderRows */
-export async function chartOrderTimingByCountry(el, orderRows) {
+export async function chartOrderTimingByCountry(el: HTMLElement, orderRows: OrderRow[]) {
   const { ordersByHourByCountry } = await import("./transform.js");
   const byHour = ordersByHourByCountry(orderRows);
   const countries = ["HK", "SG"].filter((c) => byHour.some((h) => h[c] > 0));
-  const colorMap = { HK: BLUE, SG: GREEN };
+  const colorMap: Record<string, string> = { HK: BLUE, SG: GREEN };
 
   const traces = countries.map((c) => ({
     type: "bar",
@@ -490,7 +485,7 @@ export async function chartOrderTimingByCountry(el, orderRows) {
 
   return plot(el, traces, {
     title: { text: "Order Activity by Hour (UTC) - HK vs SG", font: { size: 14, color: TEXT } },
-    height: 380,
+    height: 450,
     barmode: "group",
     xaxis: xaxis({ title: "Hour (UTC)", tickmode: "linear", dtick: 1 }),
     yaxis: yaxis({ title: "Order Count" }),
@@ -498,12 +493,11 @@ export async function chartOrderTimingByCountry(el, orderRows) {
   });
 }
 
-/** @param {HTMLElement} el @param {import('./transform.js').CoinProfitRow[]} coinRows */
-export async function chartCoinPnlByCountry(el, coinRows) {
+export async function chartCoinPnlByCountry(el: HTMLElement, coinRows: CoinProfitRow[]) {
   const { coinPnlByCountry } = await import("./transform.js");
   const { rows, countries } = coinPnlByCountry(coinRows);
-  const topRows = rows.slice(0, 15);
-  const colorMap = { HK: BLUE, SG: GREEN };
+  const topRows = rows.slice(0, 15) as Array<{ coin: string; total: number; [k: string]: any }>;
+  const colorMap: Record<string, string> = { HK: BLUE, SG: GREEN };
 
   const traces = ["HK", "SG"]
     .filter((c) => countries.includes(c))
@@ -531,7 +525,7 @@ export async function chartCoinPnlByCountry(el, coinRows) {
       text: "Coin P&L by Region - HK vs SG (Top 15 Coins)",
       font: { size: 14, color: TEXT },
     },
-    height: 440,
+    height: 450,
     barmode: "group",
     xaxis: xaxis({ title: "Coin", tickangle: -35, automargin: true }),
     yaxis: yaxis({

@@ -10,7 +10,7 @@ export const ORANGE = "#d29922";
 export const PURPLE = "#bc8cff";
 export const CYAN = "#79c0ff";
 
-export const COUNTRY_COLORS = { HK: BLUE, SG: GREEN };
+export const COUNTRY_COLORS: Record<string, string> = { HK: BLUE, SG: GREEN };
 
 export const AXIS_BASE = {
   gridcolor: BORDER,
@@ -21,7 +21,7 @@ export const AXIS_BASE = {
 };
 
 export const LAYOUT_BASE = {
-  paper_bgcolor: DARK_BG,
+  paper_bgcolor: CARD_BG,
   plot_bgcolor: CARD_BG,
   font: {
     family: '"Geist Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
@@ -31,8 +31,5 @@ export const LAYOUT_BASE = {
   margin: { l: 60, r: 30, t: 50, b: 60 },
 };
 
-/** @param {Record<string,unknown>} overrides */
-export const xaxis = (overrides = {}) => ({ ...AXIS_BASE, ...overrides });
-
-/** @param {Record<string,unknown>} overrides */
-export const yaxis = (overrides = {}) => ({ ...AXIS_BASE, ...overrides });
+export const xaxis = (overrides: Record<string, unknown> = {}) => ({ ...AXIS_BASE, ...overrides });
+export const yaxis = (overrides: Record<string, unknown> = {}) => ({ ...AXIS_BASE, ...overrides });

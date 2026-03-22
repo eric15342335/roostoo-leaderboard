@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { cache, refresh, ttlLabel, isStale } from "$lib/cache.svelte.js";
   import { MUTED, ORANGE } from "$lib/theme.js";
 
@@ -25,8 +25,6 @@
     >
     <a
       href="https://github.com/eric15342335/roostoo-leaderboard"
-      target="_blank"
-      rel="noopener noreferrer"
       class="gh-link"
       title="View source on GitHub"
     >

@@ -8,8 +8,8 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write '**/**/*.{js,ts,svelte}'",
 		"diff": "git --no-pager diff --staged --function-context > commit.txt",
 		"lint": "eslint ."
@@ -28,6 +28,7 @@
 		"svelte": "~5.54.1",
 		"svelte-check": "~4.4.5",
 		"typescript": "~5.9.3",
+		"typescript-eslint": "~8.57.1",
 		"vite": "~8.0.1"
 	},
 	"dependencies": {
