@@ -26,8 +26,8 @@
   let ready = $state(false);
   let region = $state("ALL");
 
-  onMount(() => {
-    const hadStored = loadFromStorage();
+  onMount(async () => {
+    const hadStored = await loadFromStorage();
     if (!hadStored || isStale()) {
       refresh(true);
     }

@@ -1,6 +1,8 @@
 import { fetchAll } from "./api.js";
 import { transform } from "./transform.js";
 
+const DB_NAME = "crypto_dash";
+const STORE_NAME = "cache";
 const STORAGE_KEY = "crypto_dash_cache_v2";
 
 function getAdaptiveTtlMs() {
@@ -16,21 +18,47 @@ function getAdaptiveTtlMs() {
   return 60 * 60 * 1000;
 }
 
-function readStorage() {
+function openDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = (e) => {
+      const db = (e.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = (e) => resolve((e.target as IDBOpenDBRequest).result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function readStorage(): Promise<{ data: ReturnType<typeof transform>; ts: number } | null> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    const db = await openDb();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(STORAGE_KEY);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => resolve(null);
+    });
   } catch {
     return null;
   }
 }
 
-function writeStorage(data: ReturnType<typeof transform>) {
+async function writeStorage(data: ReturnType<typeof transform>): Promise<boolean> {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ data, ts: Date.now() }));
+    const db = await openDb();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.put({ data, ts: Date.now() }, STORAGE_KEY);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
   } catch {
-    // localStorage unavailable (e.g. private browsing quota exceeded) — skip silently
+    return false;
   }
 }
 
@@ -54,8 +82,8 @@ export function isStale() {
   return Date.now() - cache.fetchedAt > getAdaptiveTtlMs();
 }
 
-export function loadFromStorage() {
-  const stored = readStorage();
+export async function loadFromStorage(): Promise<boolean> {
+  const stored = await readStorage();
   if (!stored) return false;
   cache.data = stored.data;
   cache.fetchedAt = stored.ts;
@@ -76,9 +104,10 @@ export async function refresh(force = false) {
       cache.progress = done;
       cache.progressTotal = total;
     });
-    cache.data = transform(raw);
+    const data = transform(raw);
+    cache.data = data;
     cache.fetchedAt = Date.now();
-    writeStorage(cache.data);
+    await writeStorage(data);
   } catch (e) {
     cache.error = e instanceof Error ? e.message : String(e);
   } finally {
