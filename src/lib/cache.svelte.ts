@@ -1,7 +1,7 @@
 import { fetchAll } from "./api.js";
 import { transform } from "./transform.js";
 
-const STORAGE_KEY = "crypto_dash_cache_v1";
+const STORAGE_KEY = "crypto_dash_cache_v2";
 
 function getAdaptiveTtlMs() {
   const hour = Number(
@@ -11,8 +11,8 @@ function getAdaptiveTtlMs() {
       hour12: false,
     }).format(new Date())
   );
-  if (hour >= 9 && hour < 22) return 5 * 60 * 1000;
-  if (hour >= 22 || hour < 2) return 15 * 60 * 1000;
+  if (hour >= 9 && hour < 22) return 15 * 60 * 1000;
+  if (hour >= 22 || hour < 2) return 30 * 60 * 1000;
   return 60 * 60 * 1000;
 }
 

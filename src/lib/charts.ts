@@ -6,6 +6,7 @@ import {
   CYAN,
   GREEN,
   MUTED,
+  ORANGE,
   PURPLE,
   RED,
   TEXT,
@@ -114,8 +115,11 @@ export async function chartVolume(el: HTMLElement, rows: LbEntry[]) {
 }
 
 export async function chartBuySell(el: HTMLElement, rows: LbEntry[]) {
-  const sorted = [...rows].sort((a, b) => b.buyCount + b.sellCount - (a.buyCount + a.sellCount));
-  const height = Math.max(480, rows.length * 22 + 110);
+  const sorted = [...rows]
+    .filter((r) => r.buyCount + r.sellCount > 0)
+    .sort((a, b) => b.buyCount + b.sellCount - (a.buyCount + a.sellCount))
+    .slice(0, 20);
+  const height = Math.max(480, sorted.length * 22 + 110);
   return plot(
     el,
     [
@@ -139,13 +143,44 @@ export async function chartBuySell(el: HTMLElement, rows: LbEntry[]) {
       },
     ],
     {
-      title: { text: "Buy vs Sell Order Count by Team", font: { size: 14, color: TEXT } },
+      title: { text: "Filled Orders — Buy vs Sell Count by Team", font: { size: 14, color: TEXT } },
       height,
       margin: { l: 220, r: 80, t: 50, b: 60 },
       barmode: "stack",
-      xaxis: xaxis({ title: "Order Count" }),
+      xaxis: xaxis({ title: "Filled Order Count" }),
       yaxis: yaxis({ title: "" }),
       legend: { bgcolor: CARD_BG, bordercolor: BORDER, font: { color: TEXT, size: 10 } },
+    }
+  );
+}
+
+export async function chartCancelled(el: HTMLElement, rows: LbEntry[]) {
+  const sorted = [...rows]
+    .filter((r) => r.cancelledCount > 0)
+    .sort((a, b) => b.cancelledCount - a.cancelledCount)
+    .slice(0, 20);
+  const height = Math.max(300, sorted.length * 22 + 110);
+  return plot(
+    el,
+    [
+      {
+        type: "bar",
+        orientation: "h",
+        x: sorted.map((r) => r.cancelledCount),
+        y: sorted.map((r) => r.team),
+        marker: { color: ORANGE, line: { color: BORDER, width: 0.3 } },
+        hovertemplate: "<b>%{y}</b><br>Cancelled: %{x}<extra></extra>",
+      },
+    ],
+    {
+      title: {
+        text: "Cancelled Orders by Team",
+        font: { size: 14, color: TEXT },
+      },
+      height,
+      margin: { l: 220, r: 80, t: 50, b: 60 },
+      xaxis: xaxis({ title: "Cancelled Order Count" }),
+      yaxis: yaxis({ title: "" }),
     }
   );
 }

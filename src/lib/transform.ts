@@ -9,6 +9,7 @@ export interface LbEntry {
   totalCommission: number;
   buyCount: number;
   sellCount: number;
+  cancelledCount: number;
 }
 
 export interface OrderRow {
@@ -64,8 +65,13 @@ export function transform({ compRaw, results }: { compRaw: any; results: any[] }
     let totalCommission = 0;
     let buyCount = 0;
     let sellCount = 0;
+    let cancelledCount = 0;
 
     for (const o of entryOrders) {
+      if (!o.FilledAverPrice) {
+        cancelledCount++;
+        continue;
+      }
       const notional = o.FilledQuantity * o.FilledAverPrice;
       const comm = notional * o.CommissionPercent;
       totalCommission += comm;
@@ -94,10 +100,11 @@ export function transform({ compRaw, results }: { compRaw: any; results: any[] }
       profitPct,
       currBal: entry.CurrBal,
       tradeVolume: entry.TradeVolume,
-      orderCount: entryOrders.length,
+      orderCount: entryOrders.length - cancelledCount,
       totalCommission,
       buyCount,
       sellCount,
+      cancelledCount,
     });
 
     for (const cp of portfolio?.CoinProfit ?? []) {

@@ -1,3 +1,16 @@
+// Roostoo mock exchange undocumented API.
+//
+// Auth: RST-API-KEY is not enforced -- empty string, missing, and invalid keys all
+// succeed. We send "" to match the real app.
+//
+// POST /v1/order_visitor quirks:
+//   - "limit" defaults to 1000 if omitted, silently truncating high-volume traders.
+//   - "OrderMatched" contains ALL lifecycle records including CANCELLED orders.
+//     Cancelled orders have FilledAverPrice=0 and UnitChange=0, but FilledQuantity
+//     is set to the intended order size, not the actual fill amount -- do not use it to detect fills.
+//     See transform.ts: orders where !FilledAverPrice are skipped.
+//   - Filter params (before_id, after_id, from_ts, to_ts, etc.) are silently ignored.
+
 const BASE = "https://mock-api.roostoo.com";
 
 export const HK_CPT_ID = 455;
@@ -5,6 +18,9 @@ export const SG_CPT_ID = 456;
 
 const LB_LEVEL = "OVERALL";
 const API_KEY = "";
+
+// 2^20: peak rate ~1,283 orders/hour projects to ~307k over 10 days; this gives 3x margin.
+const ORDER_FETCH_LIMIT = 1 << 20;
 
 const COMMON = {
   "Accept-Language": "en-US,en;q=0.9",
@@ -65,6 +81,7 @@ export async function fetchOrders(userCode: string, competitionId: number) {
     user_code: userCode,
     competition_id: competitionId,
     timestamp: ts(),
+    limit: ORDER_FETCH_LIMIT,
   });
   return data?.Success ? data : null;
 }
@@ -84,7 +101,7 @@ export async function fetchAll(onProgress?: (done: number, total: number) => voi
 
   let doneCount = 0;
   const reportProgress = () => onProgress?.(++doneCount, totalParticipants);
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 3;
 
   async function fetchEntries(entries: Array<{ UserCode: string }>, competitionId: number) {
     const results = [];

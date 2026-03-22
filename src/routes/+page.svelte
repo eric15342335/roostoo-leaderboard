@@ -10,6 +10,7 @@
     chartLeaderboard,
     chartVolume,
     chartBuySell,
+    chartCancelled,
     chartTopPairs,
     chartCoinPnl,
     chartHeatmap,
@@ -86,6 +87,13 @@
       <div class="grid-1">
         <PlotPanel
           chartFn={chartBuySell}
+          args={[filtered.lbRows]}
+        />
+      </div>
+
+      <div class="grid-1">
+        <PlotPanel
+          chartFn={chartCancelled}
           args={[filtered.lbRows]}
         />
       </div>
