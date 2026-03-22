@@ -1,6 +1,6 @@
 <script>
   import { cache, refresh, ttlLabel, isStale } from "$lib/cache.svelte.js";
-  import { GREEN, BLUE, MUTED, BORDER, RED, ORANGE } from "$lib/theme.js";
+  import { MUTED, ORANGE } from "$lib/theme.js";
 
   let label = $state("");
 

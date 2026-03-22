@@ -49,10 +49,10 @@ function scaleProfitPct(v) {
 }
 
 /**
- * @param {{ compRaw: any, lbRaw: any, results: any[] }} raw
+ * @param {{ compRaw: any, results: any[] }} raw
  * @returns {{ lbRows: LbEntry[], orderRows: OrderRow[], coinRows: CoinProfitRow[], meta: any }}
  */
-export function transform({ compRaw, lbRaw, results }) {
+export function transform({ compRaw, results }) {
   const lbRows = [];
   const orderRows = [];
   const coinRows = [];

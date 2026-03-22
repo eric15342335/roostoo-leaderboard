@@ -8,7 +8,7 @@
    *   title?: string
    * }}
    */
-  let { chartFn, args, title = "" } = $props();
+  let { chartFn, args, title: _title = "" } = $props();
 
   /** @type {HTMLDivElement} */
   let el;

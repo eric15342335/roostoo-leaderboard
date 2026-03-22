@@ -1,5 +1,5 @@
 <script>
-  import { BLUE, GREEN, MUTED, BORDER, CARD_BG, TEXT } from "$lib/theme.js";
+  import { BLUE, GREEN, MUTED } from "$lib/theme.js";
 
   /** @type {{ value: string, onchange: (v: string) => void }} */
   let { value, onchange } = $props();
@@ -16,7 +16,7 @@
 <div class="filter">
   <span class="label">Region</span>
   <div class="seg">
-    {#each options as opt}
+    {#each options as opt (opt.key)}
       <button
         class="seg-btn"
         class:active={value === opt.key}

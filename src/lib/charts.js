@@ -6,7 +6,6 @@ import {
   CYAN,
   GREEN,
   MUTED,
-  ORANGE,
   PURPLE,
   RED,
   TEXT,

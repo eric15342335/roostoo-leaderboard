@@ -1,5 +1,5 @@
 <script>
-  import { GREEN, RED, BLUE, ORANGE, MUTED, CARD_BG, BORDER, TEXT, PURPLE } from "$lib/theme.js";
+  import { GREEN, RED, BLUE, ORANGE, PURPLE } from "$lib/theme.js";
   import { summaryStats } from "$lib/transform.js";
 
   /** @type {{ lbRows: import('$lib/transform.js').LbEntry[], orderRows: import('$lib/transform.js').OrderRow[], meta: any }} */
