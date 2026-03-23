@@ -4,14 +4,12 @@
   let {
     chartFn,
     args,
-    title: _title = "",
   }: {
     chartFn: (el: HTMLElement, ...args: any[]) => Promise<any>;
     args: any[];
-    title?: string;
   } = $props();
 
-  let el: HTMLDivElement;
+  let el: HTMLDivElement = $state()!;
   let error = $state("");
 
   async function draw() {

@@ -40,8 +40,52 @@ async function plot(
 
 export async function chartLeaderboard(el: HTMLElement, rows: LbEntry[]) {
   const sorted = [...rows].sort((a, b) => a.profitPct - b.profitPct);
-  const vals = sorted.map((r) => r.profitPct);
-  const height = Math.max(480, rows.length * 22 + 110);
+
+  const multiRegion = new Set(rows.map((r) => r.country)).size > 1;
+  const overallRank = new Map(
+    [...rows].sort((a, b) => b.profitPct - a.profitPct).map((r, i) => [r.team, i + 1])
+  );
+
+  // Separate 0% teams and collapse them into one bar
+  const zeroTeams = sorted.filter((r) => r.profitPct === 0);
+  const nonZero = sorted.filter((r) => r.profitPct !== 0);
+
+  type BarRow = { label: string; val: number; color: string; text: string; cd: any; htmpl: string };
+  const barRows: BarRow[] = nonZero.map((r) => ({
+    label: r.team,
+    val: r.profitPct,
+    color: r.profitPct >= 0 ? GREEN : RED,
+    text: `${r.profitPct >= 0 ? "+" : ""}${parseFloat(r.profitPct.toFixed(4))}%`,
+    cd: [overallRank.get(r.team), r.country, r.rank, null],
+    htmpl: multiRegion
+      ? "<b>%{y}</b><br>P&L: %{x:.4f}%<br>Overall Rank: #%{customdata[0]}<br>%{customdata[1]} Rank: #%{customdata[2]}<extra></extra>"
+      : "<b>%{y}</b><br>P&L: %{x:.4f}%<br>%{customdata[1]} Rank: #%{customdata[2]}<extra></extra>",
+  }));
+
+  if (zeroTeams.length > 0) {
+    const insertAt = barRows.findIndex((r) => r.val > 0);
+    const idx = insertAt === -1 ? barRows.length : insertAt;
+    const label =
+      zeroTeams.length === 1 ? `${zeroTeams[0].team} (0%)` : `${zeroTeams.length} teams (0%)`;
+    const teamList = zeroTeams.map((r) => r.team).join("<br>");
+    barRows.splice(idx, 0, {
+      label,
+      val: 0,
+      color: MUTED,
+      text: "0%",
+      cd: [null, null, null, teamList],
+      htmpl:
+        zeroTeams.length === 1
+          ? "<b>%{y}</b><br>P&L: 0%<extra></extra>"
+          : `<b>${zeroTeams.length} teams at 0%</b><br>%{customdata[3]}<extra></extra>`,
+    });
+  }
+
+  const vals = barRows.map((r) => r.val);
+  const maxAbs = Math.max(...vals.map(Math.abs), 0.0001);
+  const textpositions = vals.map((v) => (Math.abs(v) / maxAbs < 0.15 ? "outside" : "inside"));
+  const height = (nonZero.length + (zeroTeams.length > 0 ? 1 : 0)) * 30 + 110;
+
   return plot(
     el,
     [
@@ -49,15 +93,16 @@ export async function chartLeaderboard(el: HTMLElement, rows: LbEntry[]) {
         type: "bar",
         orientation: "h",
         x: vals,
-        y: sorted.map((r) => r.team),
+        y: barRows.map((r) => r.label),
         marker: {
-          color: vals.map((v) => (v >= 0 ? GREEN : RED)),
+          color: barRows.map((r) => r.color),
           line: { color: BORDER, width: 0.5 },
         },
-        text: vals.map((v) => `${v >= 0 ? "+" : ""}${v.toFixed(4)}%`),
-        textposition: "auto",
+        text: barRows.map((r) => r.text),
+        textposition: textpositions,
         textfont: { size: 8, color: TEXT },
-        hovertemplate: "<b>%{y}</b><br>P&L: %{x:.4f}%<extra></extra>",
+        customdata: barRows.map((r) => r.cd),
+        hovertemplate: barRows.map((r) => r.htmpl),
       },
     ],
     {
@@ -78,8 +123,8 @@ export async function chartLeaderboard(el: HTMLElement, rows: LbEntry[]) {
 }
 
 export async function chartVolume(el: HTMLElement, rows: LbEntry[]) {
-  const sorted = [...rows].sort((a, b) => a.tradeVolume - b.tradeVolume);
-  const height = Math.max(480, rows.length * 22 + 110);
+  const sorted = [...rows].sort((a, b) => a.tradeVolume - b.tradeVolume).slice(-20);
+  const height = sorted.length * 30 + 110;
   return plot(
     el,
     [
@@ -123,39 +168,36 @@ export async function chartVolume(el: HTMLElement, rows: LbEntry[]) {
 export async function chartBuySell(el: HTMLElement, rows: LbEntry[]) {
   const sorted = [...rows]
     .filter((r) => r.buyCount + r.sellCount > 0)
-    .sort((a, b) => b.buyCount + b.sellCount - (a.buyCount + a.sellCount))
-    .slice(0, 20);
-  const height = Math.max(480, sorted.length * 22 + 110);
+    .sort((a, b) => a.rank - b.rank);
   return plot(
     el,
     [
       {
-        type: "bar",
-        name: "BUY",
-        orientation: "h",
+        type: "scatter",
+        mode: "markers+text",
         x: sorted.map((r) => r.buyCount),
-        y: sorted.map((r) => r.team),
-        marker: { color: GREEN, line: { color: BORDER, width: 0.3 } },
-        hovertemplate: "<b>%{y}</b><br>BUY: %{x}<extra></extra>",
-      },
-      {
-        type: "bar",
-        name: "SELL",
-        orientation: "h",
-        x: sorted.map((r) => r.sellCount),
-        y: sorted.map((r) => r.team),
-        marker: { color: RED, line: { color: BORDER, width: 0.3 } },
-        hovertemplate: "<b>%{y}</b><br>SELL: %{x}<extra></extra>",
+        y: sorted.map((r) => r.sellCount),
+        text: sorted.map((r) => r.team.split("(")[0].trim().slice(0, 14)),
+        textposition: "top center",
+        textfont: { size: 8, color: MUTED },
+        marker: {
+          size: 12,
+          color: sorted.map((r) => COUNTRY_COLORS[r.country] ?? PURPLE),
+          line: { color: BORDER, width: 1 },
+        },
+        hovertemplate: "<b>%{customdata}</b><br>Buy: %{x}<br>Sell: %{y}<extra></extra>",
+        customdata: sorted.map((r) => r.team),
       },
     ],
     {
-      title: { text: "Filled Orders — Buy vs Sell Count by Team", font: { size: 14, color: TEXT } },
-      height,
-      margin: { l: 220, r: 80, t: 50, b: 60 },
-      barmode: "stack",
-      xaxis: xaxis({ title: "Filled Order Count" }),
-      yaxis: yaxis({ title: "" }),
-      legend: { bgcolor: CARD_BG, bordercolor: BORDER, font: { color: TEXT, size: 10 } },
+      title: {
+        text: "Buy vs Sell Order Count",
+        font: { size: 14, color: TEXT },
+      },
+      height: Math.max(400, Math.min(rows.length, 20) * 22 + 110),
+      xaxis: xaxis({ title: "Buy Order Count" }),
+      yaxis: yaxis({ title: "Sell Order Count" }),
+      showlegend: false,
     }
   );
 }
@@ -165,7 +207,7 @@ export async function chartCancelled(el: HTMLElement, rows: LbEntry[]) {
     .filter((r) => r.cancelledCount > 0)
     .sort((a, b) => b.cancelledCount - a.cancelledCount)
     .slice(0, 20);
-  const height = Math.max(300, sorted.length * 22 + 110);
+  const height = Math.max(400, sorted.length * 22 + 110);
   return plot(
     el,
     [
@@ -175,6 +217,9 @@ export async function chartCancelled(el: HTMLElement, rows: LbEntry[]) {
         x: sorted.map((r) => r.cancelledCount),
         y: sorted.map((r) => r.team),
         marker: { color: ORANGE, line: { color: BORDER, width: 0.3 } },
+        text: sorted.map((r) => r.cancelledCount.toLocaleString()),
+        textposition: "outside",
+        textfont: { size: 9, color: TEXT },
         hovertemplate: "<b>%{y}</b><br>Cancelled: %{x}<extra></extra>",
       },
     ],
@@ -192,7 +237,7 @@ export async function chartCancelled(el: HTMLElement, rows: LbEntry[]) {
 }
 
 export async function chartTopPairs(el: HTMLElement, rows: OrderRow[]) {
-  const pairs = topPairs(rows, 15).sort((a, b) => a.pair.localeCompare(b.pair));
+  const pairs = topPairs(rows, 20);
   return plot(
     el,
     [
@@ -224,9 +269,9 @@ export async function chartTopPairs(el: HTMLElement, rows: OrderRow[]) {
       },
     ],
     {
-      title: { text: "Top 15 Trading Pairs by Volume", font: { size: 14, color: TEXT } },
+      title: { text: "Top 20 Trading Pairs by Volume", font: { size: 14, color: TEXT } },
       height: 420,
-      margin: { l: 60, r: 30, t: 50, b: 110 },
+      margin: { l: 90, r: 30, t: 50, b: 30 },
       xaxis: xaxis({ title: "Trading Pair", tickangle: -35, automargin: true }),
       yaxis: yaxis({ title: "Notional Volume (USD)", tickformat: "$,.0f" }),
       showlegend: false,
@@ -271,19 +316,26 @@ export async function chartCoinPnl(el: HTMLElement, rows: CoinProfitRow[]) {
   );
 }
 
-export async function chartHeatmap(el: HTMLElement, rows: CoinProfitRow[]) {
-  const { teams, coins: unsortedCoins, z: unsortedZ } = heatmapPivot(rows);
+export async function chartHeatmap(el: HTMLElement, rows: CoinProfitRow[], lbRows?: LbEntry[]) {
+  const { teams: unsortedTeams, coins: unsortedCoins, z: unsortedZ } = heatmapPivot(rows);
+
+  const roiByTeam = new Map(lbRows?.map((r) => [r.team, r.profitPct]) ?? []);
+  const teams = [...unsortedTeams].sort(
+    (a, b) => (roiByTeam.get(a) ?? 0) - (roiByTeam.get(b) ?? 0)
+  );
+  const teamSortedZ = teams.map((t) => unsortedZ[unsortedTeams.indexOf(t)]);
+
   const sortedIdx = unsortedCoins
     .map((_, i) => i)
     .sort((a, b) => unsortedCoins[a].localeCompare(unsortedCoins[b]));
   const coins = sortedIdx.map((i) => unsortedCoins[i]);
-  const z = unsortedZ.map((row) => sortedIdx.map((i) => row[i]));
+  const z = teamSortedZ.map((row) => sortedIdx.map((i) => row[i]));
   const nonZero = z
     .flat()
     .filter((v) => v !== 0)
     .map(Math.abs)
     .sort((a, b) => a - b);
-  const clampAbs = nonZero[Math.floor(nonZero.length * 0.95)] ?? 1;
+  const clampAbs = nonZero[Math.floor(nonZero.length * 0.75)] ?? 1;
   return plot(
     el,
     [
@@ -319,16 +371,36 @@ export async function chartHeatmap(el: HTMLElement, rows: CoinProfitRow[]) {
       title: {
         text: "Per-Coin P&L Heatmap",
         font: { size: 14, color: TEXT },
+        yref: "container",
+        y: 1,
+        yanchor: "top",
+        pad: { t: 16 },
       },
-      height: 800,
-      xaxis: xaxis({ title: "Coin", tickangle: -45, tickfont: { size: 9 } }),
+      height: teams.length * 20,
+      margin: { l: 90, r: 30, t: 80, b: 30 },
+      xaxis: xaxis({
+        title: "Coin",
+        tickangle: -45,
+        tickfont: { size: 9 },
+        side: "top",
+      }),
       yaxis: yaxis({ title: "", tickfont: { size: 9 } }),
     }
   );
 }
 
 export async function chartOrderTiming(el: HTMLElement, rows: OrderRow[]) {
-  const byHour = ordersByHour(rows);
+  const utcOffset = -new Date().getTimezoneOffset() / 60;
+  const tzLabel =
+    new Intl.DateTimeFormat("en", { timeZoneName: "short" })
+      .formatToParts(Date.now())
+      .find((p) => p.type === "timeZoneName")?.value ?? "Local";
+
+  const rawByHour = ordersByHour(rows);
+  const localCounts = new Array(24).fill(0);
+  for (const { hour, count } of rawByHour) localCounts[(hour + utcOffset + 24) % 24] += count;
+  const byHour = localCounts.map((count, hour) => ({ hour, count })).filter((x) => x.count > 0);
+
   const counts = byHour.map((h) => h.count);
   return plot(
     el,
@@ -346,36 +418,50 @@ export async function chartOrderTiming(el: HTMLElement, rows: OrderRow[]) {
           ],
           line: { color: BORDER, width: 0.4 },
         },
-        hovertemplate: "Hour %{x}:00 UTC<br>Orders: %{y}<extra></extra>",
+        hovertemplate: `Hour %{x}:00 ${tzLabel}<br>Orders: %{y}<extra></extra>`,
       },
     ],
     {
-      title: { text: "Order Activity by Hour (UTC)", font: { size: 14, color: TEXT } },
-      height: 340,
-      xaxis: xaxis({ title: "Hour (UTC)", tickmode: "linear", dtick: 1 }),
+      title: { text: `Order Activity by Hour (${tzLabel})`, font: { size: 14, color: TEXT } },
+      height: 400,
+      margin: { l: 60, r: 30, t: 50, b: 40 },
+      xaxis: xaxis({ title: `Hour (${tzLabel})`, tickmode: "linear", dtick: 1, automargin: false }),
       yaxis: yaxis({ title: "Order Count" }),
       showlegend: false,
     }
   );
 }
 
-export async function chartOrderSizeDist(el: HTMLElement, rows: OrderRow[]) {
+export async function chartVolumeVsFills(el: HTMLElement, rows: LbEntry[]) {
+  const sorted = [...rows].sort((a, b) => a.rank - b.rank);
   return plot(
     el,
     [
       {
-        type: "histogram",
-        x: rows.map((r) => r.notionalUsd),
-        nbinsx: 40,
-        marker: { color: BLUE, line: { color: BORDER, width: 0.3 }, opacity: 0.85 },
-        hovertemplate: "Size: $%{x:,.0f}<br>Count: %{y}<extra></extra>",
+        type: "scatter",
+        mode: "markers+text",
+        x: sorted.map((r) => r.tradeVolume),
+        y: sorted.map((r) => r.buyCount + r.sellCount),
+        text: sorted.map((r) => r.team.split("(")[0].trim().slice(0, 14)),
+        textposition: "top center",
+        textfont: { size: 8, color: MUTED },
+        marker: {
+          size: 12,
+          color: sorted.map((r) => COUNTRY_COLORS[r.country] ?? PURPLE),
+          line: { color: BORDER, width: 1 },
+        },
+        hovertemplate: "<b>%{customdata}</b><br>Volume: $%{x:,.0f}<br>Filled: %{y}<extra></extra>",
+        customdata: sorted.map((r) => r.team),
       },
     ],
     {
-      title: { text: "Order Size Distribution (USD Notional)", font: { size: 14, color: TEXT } },
-      height: 340,
-      xaxis: xaxis({ title: "Order Size (USD)", tickformat: "$,.0f" }),
-      yaxis: yaxis({ title: "Frequency" }),
+      title: {
+        text: "Trade Volume vs Filled Orders",
+        font: { size: 14, color: TEXT },
+      },
+      height: 400,
+      xaxis: xaxis({ title: "Trade Volume (USD)", tickformat: "$,.0f" }),
+      yaxis: yaxis({ title: "Total Filled Orders (Buy + Sell)" }),
       showlegend: false,
     }
   );
@@ -406,7 +492,7 @@ export async function chartCommission(el: HTMLElement, rows: LbEntry[]) {
     ],
     {
       title: {
-        text: "Commission Cost vs Profit % (HK=Blue, SG=Green)",
+        text: "Commission Cost vs Profit %",
         font: { size: 14, color: TEXT },
       },
       height: 400,
@@ -495,7 +581,7 @@ export async function chartHkVsSgOverview(el: HTMLElement, lbRows: LbEntry[]) {
 
   return plot(el, traces, {
     title: {
-      text: "HK vs SG - Profit % Comparison (Best / Avg / Median)",
+      text: "Profit % Comparison (Best / Avg / Median) - HK vs SG",
       font: { size: 14, color: TEXT },
     },
     height: 420,
@@ -514,25 +600,50 @@ export async function chartHkVsSgOverview(el: HTMLElement, lbRows: LbEntry[]) {
 }
 
 export async function chartOrderTimingByCountry(el: HTMLElement, orderRows: OrderRow[]) {
-  const { ordersByHourByCountry } = await import("./transform.js");
-  const byHour = ordersByHourByCountry(orderRows);
-  const countries = ["HK", "SG"].filter((c) => byHour.some((h) => h[c] > 0));
-  const colorMap: Record<string, string> = { HK: BLUE, SG: GREEN };
+  const utcOffset = -new Date().getTimezoneOffset() / 60;
+  const tzLabel =
+    new Intl.DateTimeFormat("en", { timeZoneName: "short" })
+      .formatToParts(Date.now())
+      .find((p) => p.type === "timeZoneName")?.value ?? "Local";
 
+  const { ordersByHourByCountry } = await import("./transform.js");
+  const rawByHour = ordersByHourByCountry(orderRows);
+  const countries = ["HK", "SG"].filter((c) => rawByHour.some((h) => h[c] > 0));
+
+  // Shift UTC hours to local for each country
+  const localMap: Record<string, number[]> = Object.fromEntries(
+    countries.map((c) => [c, new Array(24).fill(0)])
+  );
+  for (const entry of rawByHour) {
+    const localHour = (entry.hour + utcOffset + 24) % 24;
+    for (const c of countries) localMap[c][localHour] += entry[c] ?? 0;
+  }
+  const byHour: Array<{ hour: number } & Record<string, number>> = Array.from(
+    { length: 24 },
+    (_, hour) => ({
+      hour,
+      ...Object.fromEntries(countries.map((c) => [c, localMap[c][hour]])),
+    })
+  ).filter((e: { hour: number } & Record<string, number>) => countries.some((c) => e[c] > 0));
+
+  const colorMap: Record<string, string> = { HK: BLUE, SG: GREEN };
   const traces = countries.map((c) => ({
     type: "bar",
     name: c,
     x: byHour.map((h) => h.hour),
     y: byHour.map((h) => h[c] ?? 0),
     marker: { color: colorMap[c], opacity: 0.85, line: { color: BORDER, width: 0.3 } },
-    hovertemplate: `${c} - Hour %{x}:00 UTC<br>Orders: %{y}<extra></extra>`,
+    hovertemplate: `${c} - Hour %{x}:00 ${tzLabel}<br>Orders: %{y}<extra></extra>`,
   }));
 
   return plot(el, traces, {
-    title: { text: "Order Activity by Hour (UTC) - HK vs SG", font: { size: 14, color: TEXT } },
+    title: {
+      text: `Order Activity by Hour (${tzLabel}) - HK vs SG`,
+      font: { size: 14, color: TEXT },
+    },
     height: 450,
     barmode: "group",
-    xaxis: xaxis({ title: "Hour (UTC)", tickmode: "linear", dtick: 1 }),
+    xaxis: xaxis({ title: `Hour (${tzLabel})`, tickmode: "linear", dtick: 1 }),
     yaxis: yaxis({ title: "Order Count" }),
     legend: { bgcolor: CARD_BG, bordercolor: BORDER, font: { color: TEXT, size: 10 } },
   });

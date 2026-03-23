@@ -1,181 +1,229 @@
 <script lang="ts">
-  import { GREEN, RED, BLUE, ORANGE, PURPLE } from "$lib/theme.js";
+  import { GREEN, RED, BLUE, ORANGE } from "$lib/theme.js";
   import { summaryStats, type LbEntry, type OrderRow } from "$lib/transform.js";
 
-  let { lbRows, orderRows, meta }: { lbRows: LbEntry[]; orderRows: OrderRow[]; meta: any } =
-    $props();
+  let {
+    lbRows,
+    orderRows,
+    meta,
+    region,
+  }: { lbRows: LbEntry[]; orderRows: OrderRow[]; meta: any; region: string } = $props();
 
   let stats = $derived(summaryStats(lbRows, orderRows));
+
+  function fmtPct(v: number) {
+    return `${v >= 0 ? "+" : ""}${parseFloat(v.toFixed(4))}%`;
+  }
+  function fmtVol(v: number) {
+    return `$${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  }
+  function fmtCommission(v: number, pct: number) {
+    return `$${v.toLocaleString(undefined, { maximumFractionDigits: 2 })} (${pct.toFixed(2)}%)`;
+  }
 </script>
 
 <div class="card">
-  <div class="title">Competition Summary</div>
+  {#if region === "ALL"}
+    <div class="title">Competition Summary</div>
 
-  <div class="row">
-    <span class="key">HK Competition</span>
-    <span
-      class="val"
-      style="color:{BLUE}">{meta.hkCompetitionName ?? meta.competitionName}</span
-    >
-  </div>
-  {#if meta.sgCompetitionName}
     <div class="row">
-      <span class="key">SG Competition</span>
+      <span class="key">HK Competition</span>
       <span
         class="val"
-        style="color:{GREEN}">{meta.sgCompetitionName}</span
+        style="color:{BLUE}">{meta.hkCompetitionName ?? meta.competitionName}</span
       >
     </div>
-  {/if}
-  <div class="row">
-    <span class="key">Participants</span>
-    <span class="val">{stats.participantCount}</span>
-  </div>
-  <div class="row">
-    <span class="key">Total Orders</span>
-    <span class="val">{stats.totalOrders.toLocaleString()}</span>
-  </div>
-  <div class="row">
-    <span class="key">Total Volume</span>
-    <span class="val"
-      >${stats.totalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span
+    {#if meta.sgCompetitionName}
+      <div class="row">
+        <span class="key">SG Competition</span>
+        <span
+          class="val"
+          style="color:{GREEN}">{meta.sgCompetitionName}</span
+        >
+      </div>
+    {/if}
+    <div class="row">
+      <span class="key">Participants</span>
+      <span class="val">{stats.participantCount}</span>
+    </div>
+    <div class="row">
+      <span class="key">Total Orders</span>
+      <span class="val">{stats.totalOrders.toLocaleString()}</span>
+    </div>
+    <div class="row">
+      <span class="key">Total Volume</span>
+      <span class="val">{fmtVol(stats.totalVolume)}</span>
+    </div>
+    <div class="row">
+      <span class="key">Total Commission</span>
+      <span
+        class="val"
+        style="color:{ORANGE}">{fmtCommission(stats.totalCommission, stats.commissionPct)}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Avg P&amp;L</span>
+      <span
+        class="val"
+        style="color:{stats.avgProfitPct >= 0 ? GREEN : RED}">{fmtPct(stats.avgProfitPct)}</span
+      >
+    </div>
+    {#if stats.bestTeam}
+      <div class="row">
+        <span class="key">Best Team</span>
+        <span
+          class="val"
+          style="color:{GREEN}">{stats.bestTeam.team} ({fmtPct(stats.bestTeam.profitPct)})</span
+        >
+      </div>
+    {/if}
+    {#if stats.worstTeam}
+      <div class="row">
+        <span class="key">Worst Team</span>
+        <span
+          class="val"
+          style="color:{RED}">{stats.worstTeam.team} ({fmtPct(stats.worstTeam.profitPct)})</span
+        >
+      </div>
+    {/if}
+  {:else if region === "HK"}
+    <div
+      class="title"
+      style="color:{BLUE}"
     >
-  </div>
-  <div class="row">
-    <span class="key">Total Commission</span>
-    <span
-      class="val"
-      style="color:{ORANGE}"
-      >${stats.totalCommission.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span
-    >
-  </div>
-  <div class="row">
-    <span class="key">Avg P&L</span>
-    <span
-      class="val"
-      style="color:{stats.avgProfitPct >= 0 ? GREEN : RED}"
-    >
-      {stats.avgProfitPct >= 0 ? "+" : ""}{stats.avgProfitPct.toFixed(4)}%
-    </span>
-  </div>
-  <div class="row">
-    <span class="key">Best Team</span>
-    <span
-      class="val"
+      HK Summary
+    </div>
+
+    <div class="row">
+      <span class="key">HK Competition</span>
+      <span
+        class="val"
+        style="color:{BLUE}">{meta.hkCompetitionName ?? meta.competitionName}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Teams</span>
+      <span
+        class="val"
+        style="color:{BLUE}">{stats.participantCount}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Total Orders</span>
+      <span
+        class="val"
+        style="color:{BLUE}">{stats.totalOrders.toLocaleString()}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Total Volume</span>
+      <span
+        class="val"
+        style="color:{BLUE}">{fmtVol(stats.totalVolume)}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Total Commission</span>
+      <span
+        class="val"
+        style="color:{ORANGE}">{fmtCommission(stats.totalCommission, stats.commissionPct)}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Avg P&amp;L</span>
+      <span
+        class="val"
+        style="color:{stats.avgProfitPct >= 0 ? BLUE : RED}">{fmtPct(stats.avgProfitPct)}</span
+      >
+    </div>
+    {#if stats.bestTeam}
+      <div class="row">
+        <span class="key">Best Team</span>
+        <span
+          class="val"
+          style="color:{GREEN}">{stats.bestTeam.team} ({fmtPct(stats.bestTeam.profitPct)})</span
+        >
+      </div>
+    {/if}
+    {#if stats.worstTeam && stats.worstTeam !== stats.bestTeam}
+      <div class="row">
+        <span class="key">Worst Team</span>
+        <span
+          class="val"
+          style="color:{RED}">{stats.worstTeam.team} ({fmtPct(stats.worstTeam.profitPct)})</span
+        >
+      </div>
+    {/if}
+  {:else if region === "SG"}
+    <div
+      class="title"
       style="color:{GREEN}"
     >
-      {stats.bestTeam.team}
-      ({stats.bestTeam.profitPct >= 0 ? "+" : ""}{stats.bestTeam.profitPct.toFixed(4)}%)
-    </span>
-  </div>
-  <div class="row">
-    <span class="key">Worst Team</span>
-    <span
-      class="val"
-      style="color:{RED}"
-    >
-      {stats.worstTeam.team}
-      ({stats.worstTeam.profitPct >= 0 ? "+" : ""}{stats.worstTeam.profitPct.toFixed(4)}%)
-    </span>
-  </div>
-  {#if stats.hkCount > 0}
-    <div class="row">
-      <span class="key">HK Teams</span>
-      <span
-        class="val"
-        style="color:{BLUE}">{stats.hkCount}</span
-      >
+      SG Summary
     </div>
-    {#if stats.hkBestTeam}
+
+    {#if meta.sgCompetitionName}
       <div class="row">
-        <span class="key">HK Best Team</span>
+        <span class="key">SG Competition</span>
         <span
           class="val"
-          style="color:{BLUE}"
-        >
-          {stats.hkBestTeam.team}
-          ({stats.hkBestTeam.profitPct >= 0 ? "+" : ""}{stats.hkBestTeam.profitPct.toFixed(4)}%)
-        </span>
-      </div>
-      <div class="row">
-        <span class="key">HK Avg P&amp;L</span>
-        <span
-          class="val"
-          style="color:{stats.hkAvgProfitPct >= 0 ? BLUE : RED}"
-        >
-          {stats.hkAvgProfitPct >= 0 ? "+" : ""}{stats.hkAvgProfitPct.toFixed(4)}%
-        </span>
-      </div>
-      <div class="row">
-        <span class="key">HK Total Volume</span>
-        <span
-          class="val"
-          style="color:{BLUE}"
-          >${stats.hkTotalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span
-        >
-      </div>
-      <div class="row">
-        <span class="key">HK Total Orders</span>
-        <span
-          class="val"
-          style="color:{BLUE}">{stats.hkTotalOrders.toLocaleString()}</span
+          style="color:{GREEN}">{meta.sgCompetitionName}</span
         >
       </div>
     {/if}
-  {/if}
-  {#if stats.sgCount > 0}
     <div class="row">
-      <span class="key">SG Teams</span>
+      <span class="key">Teams</span>
       <span
         class="val"
-        style="color:{GREEN}">{stats.sgCount}</span
+        style="color:{GREEN}">{stats.participantCount}</span
       >
     </div>
-    {#if stats.sgBestTeam}
+    <div class="row">
+      <span class="key">Total Orders</span>
+      <span
+        class="val"
+        style="color:{GREEN}">{stats.totalOrders.toLocaleString()}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Total Volume</span>
+      <span
+        class="val"
+        style="color:{GREEN}">{fmtVol(stats.totalVolume)}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Total Commission</span>
+      <span
+        class="val"
+        style="color:{ORANGE}">{fmtCommission(stats.totalCommission, stats.commissionPct)}</span
+      >
+    </div>
+    <div class="row">
+      <span class="key">Avg P&amp;L</span>
+      <span
+        class="val"
+        style="color:{stats.avgProfitPct >= 0 ? GREEN : RED}">{fmtPct(stats.avgProfitPct)}</span
+      >
+    </div>
+    {#if stats.bestTeam}
       <div class="row">
-        <span class="key">SG Best Team</span>
+        <span class="key">Best Team</span>
         <span
           class="val"
-          style="color:{GREEN}"
-        >
-          {stats.sgBestTeam.team}
-          ({stats.sgBestTeam.profitPct >= 0 ? "+" : ""}{stats.sgBestTeam.profitPct.toFixed(4)}%)
-        </span>
-      </div>
-      <div class="row">
-        <span class="key">SG Avg P&amp;L</span>
-        <span
-          class="val"
-          style="color:{stats.sgAvgProfitPct >= 0 ? GREEN : RED}"
-        >
-          {stats.sgAvgProfitPct >= 0 ? "+" : ""}{stats.sgAvgProfitPct.toFixed(4)}%
-        </span>
-      </div>
-      <div class="row">
-        <span class="key">SG Total Volume</span>
-        <span
-          class="val"
-          style="color:{GREEN}"
-          >${stats.sgTotalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span
-        >
-      </div>
-      <div class="row">
-        <span class="key">SG Total Orders</span>
-        <span
-          class="val"
-          style="color:{GREEN}">{stats.sgTotalOrders.toLocaleString()}</span
+          style="color:{GREEN}">{stats.bestTeam.team} ({fmtPct(stats.bestTeam.profitPct)})</span
         >
       </div>
     {/if}
-  {/if}
-  {#if stats.participantCount - stats.hkCount - stats.sgCount > 0}
-    <div class="row">
-      <span class="key">Other</span>
-      <span
-        class="val"
-        style="color:{PURPLE}">{stats.participantCount - stats.hkCount - stats.sgCount}</span
-      >
-    </div>
+    {#if stats.worstTeam && stats.worstTeam !== stats.bestTeam}
+      <div class="row">
+        <span class="key">Worst Team</span>
+        <span
+          class="val"
+          style="color:{RED}">{stats.worstTeam.team} ({fmtPct(stats.worstTeam.profitPct)})</span
+        >
+      </div>
+    {/if}
   {/if}
 </div>
 

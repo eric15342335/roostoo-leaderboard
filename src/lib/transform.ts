@@ -200,11 +200,14 @@ export function summaryStats(rows: LbEntry[], orderRows: OrderRow[]) {
   const sgRows = rows.filter((r) => r.country === "SG");
   const hkSorted = [...hkRows].sort((a, b) => b.profitPct - a.profitPct);
   const sgSorted = [...sgRows].sort((a, b) => b.profitPct - a.profitPct);
+  const totalVolume = rows.reduce((s, r) => s + r.tradeVolume, 0);
+  const totalCommission = rows.reduce((s, r) => s + r.totalCommission, 0);
   return {
     participantCount: rows.length,
     totalOrders: orderRows.length,
-    totalVolume: rows.reduce((s, r) => s + r.tradeVolume, 0),
-    totalCommission: rows.reduce((s, r) => s + r.totalCommission, 0),
+    totalVolume,
+    totalCommission,
+    commissionPct: totalVolume > 0 ? (totalCommission / totalVolume) * 100 : 0,
     avgProfitPct: rows.reduce((s, r) => s + r.profitPct, 0) / rows.length,
     bestTeam: sorted[0],
     worstTeam: sorted[sorted.length - 1],

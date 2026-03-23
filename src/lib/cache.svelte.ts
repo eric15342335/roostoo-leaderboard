@@ -38,11 +38,16 @@ export function scrapedLabel() {
   const ageMin = Math.floor(ageMs / 60000);
   const ageSec = Math.floor((ageMs % 60000) / 1000);
   const ago = ageMin > 0 ? `${ageMin}m ${ageSec}s ago` : `${ageSec}s ago`;
-  const time = new Intl.DateTimeFormat("en", {
-    timeZone: "Asia/Hong_Kong",
+  const tzLabel =
+    new Intl.DateTimeFormat("en", { timeZoneName: "short" })
+      .formatToParts(cache.fetchedAt)
+      .find((p) => p.type === "timeZoneName")?.value ?? "Local";
+  const datetime = new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  }).format(new Date(cache.fetchedAt));
-  return `Scraped at ${time} HKT (${ago})`;
+  }).format(cache.fetchedAt);
+  return `Scraped at ${datetime} ${tzLabel} (${ago})`;
 }

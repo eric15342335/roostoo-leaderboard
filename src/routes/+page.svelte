@@ -2,10 +2,8 @@
   import { onMount } from "svelte";
   import { cache, refresh } from "$lib/cache.svelte.js";
   import Header from "$lib/Header.svelte";
-  import StatCard from "$lib/StatCard.svelte";
   import PlotPanel from "$lib/PlotPanel.svelte";
   import LoadingScreen from "$lib/LoadingScreen.svelte";
-  import RegionFilter from "$lib/RegionFilter.svelte";
   import {
     chartLeaderboard,
     chartVolume,
@@ -15,7 +13,7 @@
     chartCoinPnl,
     chartHeatmap,
     chartOrderTiming,
-    chartOrderSizeDist,
+    chartVolumeVsFills,
     chartCommission,
     chartActivityVsProfit,
     chartHkVsSgOverview,
@@ -53,21 +51,15 @@
   <LoadingScreen />
 {:else if d}
   {#if filtered}
-    <Header />
+    <Header
+      lbRows={filtered.lbRows}
+      orderRows={filtered.orderRows}
+      {region}
+      onRegionChange={(v) => (region = v)}
+    />
 
     <main>
-      <div class="top-row">
-        <div class="stats-col">
-          <RegionFilter
-            value={region}
-            onchange={(v) => (region = v)}
-          />
-          <StatCard
-            lbRows={filtered.lbRows}
-            orderRows={filtered.orderRows}
-            meta={filtered.meta}
-          />
-        </div>
+      <div class="grid-1">
         <PlotPanel
           chartFn={chartLeaderboard}
           args={[filtered.lbRows]}
@@ -83,12 +75,23 @@
 
       <div class="grid-1">
         <PlotPanel
-          chartFn={chartBuySell}
-          args={[filtered.lbRows]}
+          chartFn={chartHeatmap}
+          args={[filtered.coinRows, filtered.lbRows]}
         />
       </div>
 
       <div class="grid-1">
+        <PlotPanel
+          chartFn={chartCoinPnl}
+          args={[filtered.coinRows]}
+        />
+      </div>
+
+      <div class="grid-2">
+        <PlotPanel
+          chartFn={chartBuySell}
+          args={[filtered.lbRows]}
+        />
         <PlotPanel
           chartFn={chartCancelled}
           args={[filtered.lbRows]}
@@ -102,28 +105,14 @@
         />
       </div>
 
-      <div class="grid-1">
-        <PlotPanel
-          chartFn={chartCoinPnl}
-          args={[filtered.coinRows]}
-        />
-      </div>
-
-      <div class="grid-1">
-        <PlotPanel
-          chartFn={chartHeatmap}
-          args={[filtered.coinRows]}
-        />
-      </div>
-
       <div class="grid-2">
         <PlotPanel
           chartFn={chartOrderTiming}
           args={[filtered.orderRows]}
         />
         <PlotPanel
-          chartFn={chartOrderSizeDist}
-          args={[filtered.orderRows]}
+          chartFn={chartVolumeVsFills}
+          args={[filtered.lbRows]}
         />
       </div>
 
@@ -198,19 +187,6 @@
     gap: 16px;
   }
 
-  .top-row {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 16px;
-    align-items: start;
-  }
-
-  .stats-col {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
   .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -242,7 +218,6 @@
   }
 
   @media (max-width: 900px) {
-    .top-row,
     .grid-2 {
       grid-template-columns: 1fr;
     }
