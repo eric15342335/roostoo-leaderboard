@@ -161,7 +161,7 @@
           d="M7.47 10.78a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0-1.06-1.06L8.75 8.44V1.75a.75.75 0 0 0-1.5 0v6.69L4.78 5.97a.75.75 0 0 0-1.06 1.06l3.75 3.75ZM1.75 13.25a.75.75 0 0 0 0 1.5h12.5a.75.75 0 0 0 0-1.5H1.75Z"
         />
       </svg>
-      Download Data
+      <span class="link-label">Download Data</span>
     </a>
     <a
       href="https://github.com/eric15342335/roostoo-leaderboard"
@@ -185,7 +185,7 @@
           0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
         />
       </svg>
-      GitHub
+      <span class="link-label">GitHub</span>
     </a>
   </div>
 </header>
@@ -341,5 +341,50 @@
     color: var(--red);
     font-size: 11px;
     padding: 6px 20px;
+  }
+
+  @media (max-width: 768px) {
+    header {
+      padding: 0 14px 0.75em;
+      gap: 8px;
+    }
+    .middle {
+      gap: 10px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    header {
+      position: relative;
+      padding: 8px 12px 12px;
+      gap: 12px;
+      justify-content: center;
+    }
+    .left {
+      width: 100%;
+      align-items: center;
+      text-align: center;
+    }
+    .middle {
+      gap: 8px;
+      flex: initial;
+      justify-content: center;
+    }
+    .divider {
+      display: none;
+    }
+    .ttl {
+      display: none;
+    }
+    .link-label {
+      display: none;
+    }
+    .gh-link {
+      padding: 6px 8px;
+      gap: 0;
+    }
+    .right {
+      gap: 8px;
+    }
   }
 </style>

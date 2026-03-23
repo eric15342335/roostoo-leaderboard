@@ -108,7 +108,7 @@ export async function chartLeaderboard(el: HTMLElement, rows: LbEntry[]) {
     {
       title: { text: "Portfolio Return (%) by Team", font: { size: 14, color: TEXT } },
       height,
-      margin: { l: 220, r: 80, t: 50, b: 60 },
+      margin: { l: 130, r: 30, t: 50, b: 60 },
       xaxis: xaxis({
         title: "Profit %",
         tickformat: ".3f",
@@ -146,7 +146,7 @@ export async function chartVolume(el: HTMLElement, rows: LbEntry[]) {
     {
       title: { text: "Total Trade Volume (USD) by Team", font: { size: 14, color: TEXT } },
       height,
-      margin: { l: 220, r: 80, t: 50, b: 60 },
+      margin: { l: 130, r: 30, t: 50, b: 60 },
       xaxis: xaxis({ title: "Volume (USD)", tickformat: "$,.0f" }),
       yaxis: yaxis({ title: "" }),
       showlegend: false,
@@ -229,7 +229,7 @@ export async function chartCancelled(el: HTMLElement, rows: LbEntry[]) {
         font: { size: 14, color: TEXT },
       },
       height,
-      margin: { l: 220, r: 80, t: 50, b: 60 },
+      margin: { l: 130, r: 30, t: 50, b: 60 },
       xaxis: xaxis({ title: "Cancelled Order Count" }),
       yaxis: yaxis({ title: "" }),
     }

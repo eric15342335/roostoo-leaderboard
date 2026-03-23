@@ -223,6 +223,19 @@
     }
   }
 
+  @media (max-width: 600px) {
+    main {
+      padding: 12px;
+      gap: 12px;
+    }
+    .error-box {
+      padding: 24px 20px;
+    }
+    .error-msg {
+      max-width: 100%;
+    }
+  }
+
   .error-full {
     min-height: 100vh;
     display: flex;
@@ -239,6 +252,7 @@
     flex-direction: column;
     align-items: center;
     gap: 12px;
+    max-width: calc(100vw - 40px);
   }
 
   .error-title {

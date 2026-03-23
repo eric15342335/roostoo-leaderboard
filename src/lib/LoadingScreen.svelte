@@ -31,7 +31,7 @@
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: 12px;
-    min-width: 280px;
+    min-width: min(280px, calc(100vw - 40px));
   }
   .title {
     font-size: 15px;
