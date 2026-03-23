@@ -1,6 +1,6 @@
 # roostoo-leaderboard
 
-A SvelteKit dashboard for the Roostoo 2026 SG vs. HK Quant Trading Hackathon (Universities) competition. Data is fetched by `fetcher.py` on the server-side periodically via a `crontab`, and then served as a single `data.json` file where the SvelteKit frontend can fetch and visualize the data client-side.
+A SvelteKit dashboard for the [Roostoo 2026 SG vs. HK Quant Trading Hackathon (Universities) competition](https://luma.com/tqx5xvcy?tk=5OpRgP). Data is fetched by `fetcher.py` on the server-side periodically via a `crontab`, and then served as a single `data.json` file where the SvelteKit frontend can fetch and visualize the data client-side.
 
 ## Deploy
 
@@ -13,6 +13,7 @@ pnpm install
 pnpm build
 mkdir -p /var/www/roostoo-leaderboard
 cp -r build/* /var/www/roostoo-leaderboard/
+sudo chown -R www-data:www-data /var/www/roostoo-leaderboard/
 ```
 
 ## Setting up the fetcher backend
@@ -20,7 +21,9 @@ cp -r build/* /var/www/roostoo-leaderboard/
 Preliminary testing:
 
 ```sh
-python -c "import fetcher; fetcher.OUTPUT_PATH = 'static/data.json'; fetcher.main()"
+python3 -c "import fetcher; fetcher.OUTPUT_PATH = 'static/data.json'; fetcher.main()"
+pnpm build
+pnpm preview
 ```
 
 ### Install
@@ -37,7 +40,6 @@ sudo chmod 755 /opt/roostoo-fetcher/fetcher.py
 Install as `www-data` so it can write to the nginx web root:
 
 ```sh
-sudo chown www-data:www-data /var/www/roostoo-leaderboard/
 sudo crontab -u www-data -e
 ```
 
