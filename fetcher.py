@@ -18,6 +18,7 @@ ORDER_FETCH_LIMIT = 1 << 20
 OUTPUT_PATH = "/var/www/roostoo-leaderboard/data.json"
 CONCURRENCY = 5
 REQUEST_TIMEOUT = 30
+TIME_BUFFER = 5 * 60
 
 UA = "Python/{}.{} github.com/eric15342335/roostoo-leaderboard".format(sys.version_info.major, sys.version_info.minor)
 
@@ -86,7 +87,7 @@ def is_fresh():
         mtime = os.path.getmtime(OUTPUT_PATH)
     except FileNotFoundError:
         return False
-    return (time.time() - mtime) < get_ttl_seconds()
+    return (time.time() - mtime) < (get_ttl_seconds() - TIME_BUFFER)
 
 
 def fetch_competition_info():
