@@ -28,10 +28,6 @@
     </div>
   {/if}
   <div class="row">
-    <span class="key">Scraped at</span>
-    <span class="val">{new Date(meta.scrapedAt).toUTCString()}</span>
-  </div>
-  <div class="row">
     <span class="key">Participants</span>
     <span class="val">{stats.participantCount}</span>
   </div>
@@ -82,61 +78,95 @@
       ({stats.worstTeam.profitPct >= 0 ? "+" : ""}{stats.worstTeam.profitPct.toFixed(4)}%)
     </span>
   </div>
-  <div class="row">
-    <span class="key">HK Teams</span>
-    <span
-      class="val"
-      style="color:{BLUE}">{stats.hkCount}</span
-    >
-  </div>
-  {#if stats.hkBestTeam}
+  {#if stats.hkCount > 0}
     <div class="row">
-      <span class="key">HK Best Team</span>
+      <span class="key">HK Teams</span>
       <span
         class="val"
-        style="color:{BLUE}"
+        style="color:{BLUE}">{stats.hkCount}</span
       >
-        {stats.hkBestTeam.team}
-        ({stats.hkBestTeam.profitPct >= 0 ? "+" : ""}{stats.hkBestTeam.profitPct.toFixed(4)}%)
-      </span>
     </div>
-    <div class="row">
-      <span class="key">HK Avg P&amp;L</span>
-      <span
-        class="val"
-        style="color:{stats.hkAvgProfitPct >= 0 ? BLUE : RED}"
-      >
-        {stats.hkAvgProfitPct >= 0 ? "+" : ""}{stats.hkAvgProfitPct.toFixed(4)}%
-      </span>
-    </div>
+    {#if stats.hkBestTeam}
+      <div class="row">
+        <span class="key">HK Best Team</span>
+        <span
+          class="val"
+          style="color:{BLUE}"
+        >
+          {stats.hkBestTeam.team}
+          ({stats.hkBestTeam.profitPct >= 0 ? "+" : ""}{stats.hkBestTeam.profitPct.toFixed(4)}%)
+        </span>
+      </div>
+      <div class="row">
+        <span class="key">HK Avg P&amp;L</span>
+        <span
+          class="val"
+          style="color:{stats.hkAvgProfitPct >= 0 ? BLUE : RED}"
+        >
+          {stats.hkAvgProfitPct >= 0 ? "+" : ""}{stats.hkAvgProfitPct.toFixed(4)}%
+        </span>
+      </div>
+      <div class="row">
+        <span class="key">HK Total Volume</span>
+        <span
+          class="val"
+          style="color:{BLUE}"
+          >${stats.hkTotalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span
+        >
+      </div>
+      <div class="row">
+        <span class="key">HK Total Orders</span>
+        <span
+          class="val"
+          style="color:{BLUE}">{stats.hkTotalOrders.toLocaleString()}</span
+        >
+      </div>
+    {/if}
   {/if}
-  <div class="row">
-    <span class="key">SG Teams</span>
-    <span
-      class="val"
-      style="color:{GREEN}">{stats.sgCount}</span
-    >
-  </div>
-  {#if stats.sgBestTeam}
+  {#if stats.sgCount > 0}
     <div class="row">
-      <span class="key">SG Best Team</span>
+      <span class="key">SG Teams</span>
       <span
         class="val"
-        style="color:{GREEN}"
+        style="color:{GREEN}">{stats.sgCount}</span
       >
-        {stats.sgBestTeam.team}
-        ({stats.sgBestTeam.profitPct >= 0 ? "+" : ""}{stats.sgBestTeam.profitPct.toFixed(4)}%)
-      </span>
     </div>
-    <div class="row">
-      <span class="key">SG Avg P&amp;L</span>
-      <span
-        class="val"
-        style="color:{stats.sgAvgProfitPct >= 0 ? GREEN : RED}"
-      >
-        {stats.sgAvgProfitPct >= 0 ? "+" : ""}{stats.sgAvgProfitPct.toFixed(4)}%
-      </span>
-    </div>
+    {#if stats.sgBestTeam}
+      <div class="row">
+        <span class="key">SG Best Team</span>
+        <span
+          class="val"
+          style="color:{GREEN}"
+        >
+          {stats.sgBestTeam.team}
+          ({stats.sgBestTeam.profitPct >= 0 ? "+" : ""}{stats.sgBestTeam.profitPct.toFixed(4)}%)
+        </span>
+      </div>
+      <div class="row">
+        <span class="key">SG Avg P&amp;L</span>
+        <span
+          class="val"
+          style="color:{stats.sgAvgProfitPct >= 0 ? GREEN : RED}"
+        >
+          {stats.sgAvgProfitPct >= 0 ? "+" : ""}{stats.sgAvgProfitPct.toFixed(4)}%
+        </span>
+      </div>
+      <div class="row">
+        <span class="key">SG Total Volume</span>
+        <span
+          class="val"
+          style="color:{GREEN}"
+          >${stats.sgTotalVolume.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span
+        >
+      </div>
+      <div class="row">
+        <span class="key">SG Total Orders</span>
+        <span
+          class="val"
+          style="color:{GREEN}">{stats.sgTotalOrders.toLocaleString()}</span
+        >
+      </div>
+    {/if}
   {/if}
   {#if stats.participantCount - stats.hkCount - stats.sgCount > 0}
     <div class="row">
@@ -170,6 +200,9 @@
     padding: 4px 0;
     border-bottom: 1px solid var(--border);
     gap: 1px;
+  }
+  .row:last-child {
+    border-bottom: none;
   }
   .key {
     color: var(--muted);

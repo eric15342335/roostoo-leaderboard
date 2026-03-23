@@ -3,6 +3,7 @@ import {
   BLUE,
   BORDER,
   CARD_BG,
+  DARK_BG,
   CYAN,
   GREEN,
   MUTED,
@@ -26,9 +27,14 @@ import {
 
 const cfg = { displayModeBar: true, displaylogo: false, responsive: true };
 
-async function plot(el: HTMLElement, traces: any[], layout: any) {
+async function plot(
+  el: HTMLElement,
+  traces: any[],
+  layout: any,
+  extraCfg: Record<string, unknown> = {}
+) {
   const Plotly = (await import("./plotly-custom.js")).default;
-  (Plotly as any).react(el, traces, { ...LAYOUT_BASE, ...layout }, cfg);
+  (Plotly as any).react(el, traces, { ...LAYOUT_BASE, ...layout }, { ...cfg, ...extraCfg });
   return Plotly;
 }
 
@@ -186,7 +192,7 @@ export async function chartCancelled(el: HTMLElement, rows: LbEntry[]) {
 }
 
 export async function chartTopPairs(el: HTMLElement, rows: OrderRow[]) {
-  const pairs = topPairs(rows, 15);
+  const pairs = topPairs(rows, 15).sort((a, b) => a.pair.localeCompare(b.pair));
   return plot(
     el,
     [
@@ -229,7 +235,7 @@ export async function chartTopPairs(el: HTMLElement, rows: OrderRow[]) {
 }
 
 export async function chartCoinPnl(el: HTMLElement, rows: CoinProfitRow[]) {
-  const agg = coinPnlAggregate(rows);
+  const agg = coinPnlAggregate(rows).sort((a, b) => a.coin.localeCompare(b.coin));
   const profits = agg.map((a) => a.netProfit);
   return plot(
     el,
@@ -266,8 +272,18 @@ export async function chartCoinPnl(el: HTMLElement, rows: CoinProfitRow[]) {
 }
 
 export async function chartHeatmap(el: HTMLElement, rows: CoinProfitRow[]) {
-  const { teams, coins, z } = heatmapPivot(rows, 20);
-  const maxAbs = Math.max(...z.flat().map(Math.abs), 1);
+  const { teams, coins: unsortedCoins, z: unsortedZ } = heatmapPivot(rows);
+  const sortedIdx = unsortedCoins
+    .map((_, i) => i)
+    .sort((a, b) => unsortedCoins[a].localeCompare(unsortedCoins[b]));
+  const coins = sortedIdx.map((i) => unsortedCoins[i]);
+  const z = unsortedZ.map((row) => sortedIdx.map((i) => row[i]));
+  const nonZero = z
+    .flat()
+    .filter((v) => v !== 0)
+    .map(Math.abs)
+    .sort((a, b) => a - b);
+  const clampAbs = nonZero[Math.floor(nonZero.length * 0.95)] ?? 1;
   return plot(
     el,
     [
@@ -278,13 +294,15 @@ export async function chartHeatmap(el: HTMLElement, rows: CoinProfitRow[]) {
         y: teams,
         colorscale: [
           [0, RED],
-          [0.5, CARD_BG],
+          [0.5, DARK_BG],
           [1, GREEN],
         ],
         zmid: 0,
-        zmin: -maxAbs,
-        zmax: maxAbs,
-        text: z.map((row) => row.map((v) => `${v >= 0 ? "+" : ""}${v.toFixed(0)}`)),
+        zmin: -clampAbs,
+        zmax: clampAbs,
+        text: z.map((row) =>
+          row.map((v) => (v === 0 ? "" : `${v >= 0 ? "+" : ""}${v.toFixed(0)}`))
+        ),
         texttemplate: "%{text}",
         textfont: { size: 8 },
         hovertemplate: "<b>%{y}</b> | %{x}<br>P&L: $%{z:+,.2f}<extra></extra>",
@@ -298,8 +316,11 @@ export async function chartHeatmap(el: HTMLElement, rows: CoinProfitRow[]) {
       },
     ],
     {
-      title: { text: "Per-Coin P&L Heatmap by Team (Top 20)", font: { size: 14, color: TEXT } },
-      height: 700,
+      title: {
+        text: "Per-Coin P&L Heatmap",
+        font: { size: 14, color: TEXT },
+      },
+      height: 800,
       xaxis: xaxis({ title: "Coin", tickangle: -45, tickfont: { size: 9 } }),
       yaxis: yaxis({ title: "", tickfont: { size: 9 } }),
     }
@@ -448,30 +469,28 @@ export async function chartHkVsSgOverview(el: HTMLElement, lbRows: LbEntry[]) {
   );
   if (breakdown.length < 2) return;
 
-  const countries = breakdown.map((d) => d.country);
-  const colors = countries.map((c) => (c === "HK" ? BLUE : GREEN));
-
-  // Show best, average, and median profit % as grouped bars — same unit, comparable scale
-  const series = [
-    { name: "Best Profit %", values: breakdown.map((d) => d.bestProfitPct) },
-    { name: "Avg Profit %", values: breakdown.map((d) => d.avgProfitPct) },
-    { name: "Median Profit %", values: breakdown.map((d) => d.medianProfitPct) },
+  const metrics = [
+    { name: "Best Profit %", key: "bestProfitPct" as const },
+    { name: "Avg Profit %", key: "avgProfitPct" as const },
+    { name: "Median Profit %", key: "medianProfitPct" as const },
   ];
 
-  const traces = series.map((s, si) => ({
+  const traces = breakdown.map((d) => ({
     type: "bar",
-    name: s.name,
-    x: countries,
-    y: s.values,
-    text: s.values.map((v) => `${v >= 0 ? "+" : ""}${v.toFixed(4)}%`),
+    name: d.country,
+    x: metrics.map((m) => m.name),
+    y: metrics.map((m) => d[m.key]),
+    text: metrics.map((m) => {
+      const v = d[m.key];
+      return `${v >= 0 ? "+" : ""}${v.toFixed(4)}%`;
+    }),
     textposition: "outside",
     textfont: { size: 10, color: TEXT },
     marker: {
-      color: colors,
-      opacity: 1 - si * 0.2,
+      color: d.country === "HK" ? BLUE : GREEN,
       line: { color: BORDER, width: 0.5 },
     },
-    hovertemplate: `<b>%{x}</b><br>${s.name}: %{text}<extra></extra>`,
+    hovertemplate: `<b>${d.country}</b><br>%{x}: %{text}<extra></extra>`,
   }));
 
   return plot(el, traces, {
@@ -491,15 +510,6 @@ export async function chartHkVsSgOverview(el: HTMLElement, lbRows: LbEntry[]) {
       zerolinecolor: MUTED,
     }),
     legend: { bgcolor: CARD_BG, bordercolor: BORDER, font: { color: TEXT, size: 10 } },
-    annotations: breakdown.map((d) => ({
-      x: d.country,
-      y: -0.18,
-      xref: "x",
-      yref: "paper",
-      text: `n=${d.count} | vol $${(d.totalVolume / 1e6).toFixed(1)}M | ${d.totalOrders} orders`,
-      showarrow: false,
-      font: { size: 9, color: MUTED },
-    })),
   });
 }
 
@@ -531,7 +541,9 @@ export async function chartOrderTimingByCountry(el: HTMLElement, orderRows: Orde
 export async function chartCoinPnlByCountry(el: HTMLElement, coinRows: CoinProfitRow[]) {
   const { coinPnlByCountry } = await import("./transform.js");
   const { rows, countries } = coinPnlByCountry(coinRows);
-  const topRows = rows.slice(0, 15) as Array<{ coin: string; total: number; [k: string]: any }>;
+  const topRows = (rows as Array<{ coin: string; total: number; [k: string]: any }>).sort((a, b) =>
+    a.coin.localeCompare(b.coin)
+  );
   const colorMap: Record<string, string> = { HK: BLUE, SG: GREEN };
 
   const traces = ["HK", "SG"]
@@ -557,7 +569,7 @@ export async function chartCoinPnlByCountry(el: HTMLElement, coinRows: CoinProfi
 
   return plot(el, traces, {
     title: {
-      text: "Coin P&L by Region - HK vs SG (Top 15 Coins)",
+      text: "Coin P&L by Region - HK vs SG",
       font: { size: 14, color: TEXT },
     },
     height: 450,

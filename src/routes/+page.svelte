@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { cache, refresh, loadFromStorage, isStale } from "$lib/cache.svelte.js";
+  import { cache, refresh } from "$lib/cache.svelte.js";
   import Header from "$lib/Header.svelte";
   import StatCard from "$lib/StatCard.svelte";
   import PlotPanel from "$lib/PlotPanel.svelte";
@@ -26,11 +26,8 @@
   let ready = $state(false);
   let region = $state("ALL");
 
-  onMount(async () => {
-    const hadStored = await loadFromStorage();
-    if (!hadStored || isStale()) {
-      refresh(true);
-    }
+  onMount(() => {
+    refresh();
     ready = true;
   });
 
@@ -146,18 +143,18 @@
           <span>Hong Kong vs Singapore</span>
         </div>
 
-        <div class="grid-1">
+        <div class="grid-2">
           <PlotPanel
             chartFn={chartHkVsSgOverview}
             args={[filtered.lbRows]}
           />
-        </div>
-
-        <div class="grid-2">
           <PlotPanel
             chartFn={chartOrderTimingByCountry}
             args={[filtered.orderRows]}
           />
+        </div>
+
+        <div class="grid-1">
           <PlotPanel
             chartFn={chartCoinPnlByCountry}
             args={[filtered.coinRows]}
@@ -172,7 +169,7 @@
       <div class="error-title">Failed to load data</div>
       <div class="error-msg">{cache.error}</div>
       <button
-        onclick={() => refresh(true)}
+        onclick={() => refresh()}
         class="retry-btn">Retry</button
       >
     </div>

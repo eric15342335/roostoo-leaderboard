@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { cache, refresh, ttlLabel, isStale } from "$lib/cache.svelte.js";
-  import { MUTED, ORANGE } from "$lib/theme.js";
+  import { cache, scrapedLabel } from "$lib/cache.svelte.js";
 
   let label = $state("");
 
   $effect(() => {
-    label = ttlLabel();
+    label = scrapedLabel();
     const id = setInterval(() => {
-      label = ttlLabel();
+      label = scrapedLabel();
     }, 1000);
     return () => clearInterval(id);
   });
@@ -19,10 +18,7 @@
     <span class="sub">Round 1 HK &amp; SG &mdash; Live Leaderboard</span>
   </div>
   <div class="right">
-    <span
-      class="ttl"
-      style="color:{isStale() ? ORANGE : MUTED}">{label}</span
-    >
+    <span class="ttl">{label}</span>
     <a
       href="https://github.com/eric15342335/roostoo-leaderboard"
       class="gh-link"
@@ -47,30 +43,13 @@
       </svg>
       GitHub
     </a>
-    <button
-      onclick={() => refresh(true)}
-      disabled={cache.loading}
-      class="btn"
-    >
-      {cache.loading ? "Fetching..." : "Refresh"}
-    </button>
   </div>
 </header>
 
-{#if cache.loading && cache.progressTotal > 0}
-  <div class="progress-wrap">
-    <div
-      class="progress-bar"
-      style="width:{(cache.progress / cache.progressTotal) * 100}%"
-    ></div>
-    <span class="progress-label">
-      Fetching participant {cache.progress} / {cache.progressTotal}
-    </span>
-  </div>
-{:else if cache.loading}
+{#if cache.loading}
   <div class="progress-wrap">
     <div class="progress-bar indeterminate"></div>
-    <span class="progress-label">Connecting...</span>
+    <span class="progress-label">Fetching data...</span>
   </div>
 {/if}
 
@@ -108,6 +87,7 @@
   }
   .ttl {
     font-size: 11px;
+    color: var(--muted);
   }
   .gh-link {
     display: flex;
@@ -127,23 +107,6 @@
     color: var(--text);
     border-color: var(--muted);
   }
-  .btn {
-    background: #1f2937;
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 14px;
-    font-family: inherit;
-    font-size: 12px;
-    transition: background 0.15s;
-  }
-  .btn:hover:not(:disabled) {
-    background: #2d3748;
-  }
-  .btn:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
   .progress-wrap {
     height: 4px;
     background: var(--card-bg);
@@ -153,7 +116,6 @@
   .progress-bar {
     height: 100%;
     background: var(--blue);
-    transition: width 0.2s;
   }
   .progress-label {
     position: absolute;

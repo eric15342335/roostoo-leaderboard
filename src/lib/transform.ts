@@ -172,24 +172,26 @@ export function ordersByHour(rows: OrderRow[]) {
   return counts.map((count, hour) => ({ hour, count })).filter((x) => x.count > 0);
 }
 
-export function heatmapPivot(rows: CoinProfitRow[], maxCoins = 20) {
+export function heatmapPivot(rows: CoinProfitRow[]) {
   const teams = [...new Set(rows.map((r) => r.team))];
   const allCoins = [...new Set(rows.map((r) => r.coin))];
 
   const lookup = new Map(rows.map((r) => [`${r.team}|${r.coin}`, r.totalProfit]));
 
-  const coinActivity = allCoins.map((coin) => ({
-    coin,
-    activity: rows.filter((r) => r.coin === coin).reduce((s, r) => s + Math.abs(r.totalProfit), 0),
-  }));
-  const topCoins = coinActivity
+  const activeCoins = allCoins
+    .map((coin) => ({
+      coin,
+      activity: rows
+        .filter((r) => r.coin === coin)
+        .reduce((s, r) => s + Math.abs(r.totalProfit), 0),
+    }))
+    .filter((x) => x.activity > 0)
     .sort((a, b) => b.activity - a.activity)
-    .slice(0, maxCoins)
     .map((x) => x.coin);
 
-  const z = teams.map((team) => topCoins.map((coin) => lookup.get(`${team}|${coin}`) ?? 0));
+  const z = teams.map((team) => activeCoins.map((coin) => lookup.get(`${team}|${coin}`) ?? 0));
 
-  return { teams, coins: topCoins, z };
+  return { teams, coins: activeCoins, z };
 }
 
 export function summaryStats(rows: LbEntry[], orderRows: OrderRow[]) {
@@ -214,6 +216,8 @@ export function summaryStats(rows: LbEntry[], orderRows: OrderRow[]) {
     sgBestTeam: sgSorted[0] ?? null,
     hkTotalVolume: hkRows.reduce((s, r) => s + r.tradeVolume, 0),
     sgTotalVolume: sgRows.reduce((s, r) => s + r.tradeVolume, 0),
+    hkTotalOrders: hkRows.reduce((s, r) => s + r.orderCount, 0),
+    sgTotalOrders: sgRows.reduce((s, r) => s + r.orderCount, 0),
   };
 }
 

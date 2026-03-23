@@ -1,10 +1,10 @@
 # roostoo-leaderboard
 
-Todo README.
+A SvelteKit dashboard for the Roostoo 2026 SG vs. HK Quant Trading Hackathon (Universities) competition. Data is fetched by `fetcher.py` on the server-side periodically via a `crontab`, and then served as a single `data.json` file where the SvelteKit frontend can fetch and visualize the data client-side.
 
 ## Deploy
 
-Using nginx.
+### Setting up the static frontend
 
 ```sh
 git clone https://github.com/eric15342335/roostoo-leaderboard
@@ -15,9 +15,46 @@ mkdir -p /var/www/roostoo-leaderboard
 cp -r build/* /var/www/roostoo-leaderboard/
 ```
 
-`/etc/nginx/sites-available/default`:
+## Setting up the fetcher backend
 
-```conf
+Preliminary testing:
+
+```sh
+python -c "import fetcher; fetcher.OUTPUT_PATH = 'static/data.json'; fetcher.main()"
+```
+
+### Install
+
+```sh
+sudo mkdir -p /opt/roostoo-fetcher
+sudo cp fetcher.py /opt/roostoo-fetcher/fetcher.py
+sudo chown -R www-data:www-data /opt/roostoo-fetcher/
+sudo chmod 755 /opt/roostoo-fetcher/fetcher.py
+```
+
+### Crontab
+
+Install as `www-data` so it can write to the nginx web root:
+
+```sh
+sudo chown www-data:www-data /var/www/roostoo-leaderboard/
+sudo crontab -u www-data -e
+```
+
+Add this line:
+
+```cron
+*/15 * * * * /usr/bin/python3 /opt/roostoo-fetcher/fetcher.py >> /opt/roostoo-fetcher/fetcher.log 2>&1
+```
+
+Logs are written to `/opt/roostoo-fetcher/fetcher.log` via crontab stdout
+redirection.
+
+## nginx configuration
+
+In `/etc/nginx/sites-available/default`, add these to your existing server block:
+
+```nginx
 location ~* ^/roostoo-leaderboard/_app/immutable/ {
     root /var/www;
     expires 1y;
@@ -25,8 +62,21 @@ location ~* ^/roostoo-leaderboard/_app/immutable/ {
     add_header X-Content-Type-Options nosniff;
 }
 
+location = /roostoo-leaderboard/data.json {
+    root /var/www;
+    add_header Cache-Control "public, max-age=60";
+}
+
 location ~ ^/roostoo-leaderboard(/.*)?$ {
     root /var/www;
     try_files $uri $uri/ /roostoo-leaderboard/index.html;
 }
+```
+
+Since we are serving large JSON files, it is recommended to enable `gzip` compression in nginx:
+
+```nginx
+gzip on;
+gzip_comp_level 6;
+gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 ```
