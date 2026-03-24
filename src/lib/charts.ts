@@ -584,9 +584,9 @@ export async function chartHkVsSgOverview(el: HTMLElement, lbRows: LbEntry[]) {
       text: "Profit % Comparison (Best / Avg / Median) - HK vs SG",
       font: { size: 14, color: TEXT },
     },
-    height: 420,
+    height: 450,
     barmode: "group",
-    margin: { l: 60, r: 30, t: 50, b: 80 },
+    margin: { l: 70, r: 20, t: 60, b: 60 },
     xaxis: xaxis({ title: "Region" }),
     yaxis: yaxis({
       title: "Profit %",
