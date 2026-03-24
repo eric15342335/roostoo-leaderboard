@@ -16,7 +16,7 @@ cp -r build/* /var/www/roostoo-leaderboard/
 sudo chown -R www-data:www-data /var/www/roostoo-leaderboard/
 ```
 
-## Setting up the fetcher backend
+### Setting up the fetcher backend
 
 Preliminary testing:
 
@@ -26,7 +26,7 @@ pnpm build
 pnpm preview
 ```
 
-### Install
+#### Install
 
 ```sh
 sudo mkdir -p /opt/roostoo-fetcher
@@ -35,7 +35,7 @@ sudo chown -R www-data:www-data /opt/roostoo-fetcher/
 sudo chmod 755 /opt/roostoo-fetcher/fetcher.py
 ```
 
-### Crontab
+#### Crontab
 
 Install as `www-data` so it can write to the nginx web root:
 
@@ -52,7 +52,7 @@ Add this line:
 Logs are written to `/opt/roostoo-fetcher/fetcher.log` via crontab stdout
 redirection.
 
-## nginx configuration
+### nginx configuration
 
 In `/etc/nginx/sites-available/default`, add these to your existing server block:
 

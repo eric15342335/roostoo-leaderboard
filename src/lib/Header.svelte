@@ -41,6 +41,11 @@
   }
 
   let regionColor = $derived(region === "HK" ? BLUE : region === "SG" ? GREEN : "var(--text)");
+  let accentColor = $derived(region === "ALL" ? "var(--text)" : regionColor);
+  let pnlPositiveColor = $derived(region === "ALL" ? GREEN : regionColor);
+  let bestTeamName = $derived(stats.bestTeam?.team.split("(")[0].trim() ?? "");
+  let worstTeamName = $derived(stats.worstTeam?.team.split("(")[0].trim() ?? "");
+  let showWorst = $derived(!!stats.worstTeam && stats.worstTeam !== stats.bestTeam);
 </script>
 
 <header>
@@ -109,80 +114,43 @@
 
 {#if lbRows.length > 0}
   <div class="stats-row">
-    {#if region === "ALL"}
-      <div class="stat">
-        <span class="slabel">Teams</span><span class="sval">{stats.participantCount}</span>
-      </div>
-      <div class="stat">
-        <span class="slabel">Volume</span><span class="sval">{fmtVol(stats.totalVolume)}</span>
-      </div>
-      <div class="stat">
-        <span class="slabel">Commission</span><span
+    <div class="stat">
+      <span class="slabel">Teams</span><span
+        class="sval"
+        style="color:{accentColor}">{stats.participantCount}</span
+      >
+    </div>
+    <div class="stat">
+      <span class="slabel">Volume</span><span
+        class="sval"
+        style="color:{accentColor}">{fmtVol(stats.totalVolume)}</span
+      >
+    </div>
+    <div class="stat">
+      <span class="slabel">Commission</span><span
+        class="sval"
+        style="color:{ORANGE}">{fmtCommission(stats.totalCommission, stats.commissionPct)}</span
+      >
+    </div>
+    <div class="stat">
+      <span class="slabel">Avg P&amp;L</span><span
+        class="sval"
+        style="color:{stats.avgProfitPct >= 0 ? pnlPositiveColor : RED}"
+        >{fmtPct(stats.avgProfitPct)}</span
+      >
+    </div>
+    {#if stats.bestTeam}<div class="stat">
+        <span class="slabel">Best</span><span
           class="sval"
-          style="color:{ORANGE}">{fmtCommission(stats.totalCommission, stats.commissionPct)}</span
+          style="color:{GREEN}">{bestTeamName} ({fmtPct(stats.bestTeam.profitPct)})</span
         >
-      </div>
-      <div class="stat">
-        <span class="slabel">Avg P&amp;L</span><span
+      </div>{/if}
+    {#if showWorst}<div class="stat">
+        <span class="slabel">Worst</span><span
           class="sval"
-          style="color:{stats.avgProfitPct >= 0 ? GREEN : RED}">{fmtPct(stats.avgProfitPct)}</span
+          style="color:{RED}">{worstTeamName} ({fmtPct(stats.worstTeam!.profitPct)})</span
         >
-      </div>
-      {#if stats.bestTeam}<div class="stat">
-          <span class="slabel">Best</span><span
-            class="sval"
-            style="color:{GREEN}"
-            >{stats.bestTeam.team.split("(")[0].trim()} ({fmtPct(stats.bestTeam.profitPct)})</span
-          >
-        </div>{/if}
-      {#if stats.worstTeam}<div class="stat">
-          <span class="slabel">Worst</span><span
-            class="sval"
-            style="color:{RED}"
-            >{stats.worstTeam.team.split("(")[0].trim()} ({fmtPct(stats.worstTeam.profitPct)})</span
-          >
-        </div>{/if}
-    {:else}
-      <div class="stat">
-        <span class="slabel">Teams</span><span
-          class="sval"
-          style="color:{regionColor}">{stats.participantCount}</span
-        >
-      </div>
-      <div class="stat">
-        <span class="slabel">Volume</span><span
-          class="sval"
-          style="color:{regionColor}">{fmtVol(stats.totalVolume)}</span
-        >
-      </div>
-      <div class="stat">
-        <span class="slabel">Commission</span><span
-          class="sval"
-          style="color:{ORANGE}">{fmtCommission(stats.totalCommission, stats.commissionPct)}</span
-        >
-      </div>
-      <div class="stat">
-        <span class="slabel">Avg P&amp;L</span><span
-          class="sval"
-          style="color:{stats.avgProfitPct >= 0 ? regionColor : RED}"
-          >{fmtPct(stats.avgProfitPct)}</span
-        >
-      </div>
-      {#if stats.bestTeam}<div class="stat">
-          <span class="slabel">Best</span><span
-            class="sval"
-            style="color:{GREEN}"
-            >{stats.bestTeam.team.split("(")[0].trim()} ({fmtPct(stats.bestTeam.profitPct)})</span
-          >
-        </div>{/if}
-      {#if stats.worstTeam && stats.worstTeam !== stats.bestTeam}<div class="stat">
-          <span class="slabel">Worst</span><span
-            class="sval"
-            style="color:{RED}"
-            >{stats.worstTeam.team.split("(")[0].trim()} ({fmtPct(stats.worstTeam.profitPct)})</span
-          >
-        </div>{/if}
-    {/if}
+      </div>{/if}
   </div>
 {/if}
 
