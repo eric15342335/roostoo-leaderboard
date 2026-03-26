@@ -40,12 +40,23 @@
     return `${fmtVol(v)} (${pct.toFixed(2)}%)`;
   }
 
-  let regionColor = $derived(region === "HK" ? BLUE : region === "SG" ? GREEN : "var(--text)");
+  let regionColor = $derived(getRegionColor(region));
   let accentColor = $derived(region === "ALL" ? "var(--text)" : regionColor);
   let pnlPositiveColor = $derived(region === "ALL" ? GREEN : regionColor);
-  let bestTeamName = $derived(stats.bestTeam?.team.split("(")[0].trim() ?? "");
-  let worstTeamName = $derived(stats.worstTeam?.team.split("(")[0].trim() ?? "");
+
+  function getRegionColor(region: string): string {
+    if (region === "HK") return BLUE;
+    if (region === "SG") return GREEN;
+    return "var(--text)";
+  }
+  let bestTeamName = $derived(extractTeamName(stats.bestTeam?.team));
+  let worstTeamName = $derived(extractTeamName(stats.worstTeam?.team));
   let showWorst = $derived(!!stats.worstTeam && stats.worstTeam !== stats.bestTeam);
+
+  function extractTeamName(fullTeam: string | undefined): string {
+    if (!fullTeam) return "";
+    return fullTeam.split("(")[0].trim();
+  }
 </script>
 
 <header>

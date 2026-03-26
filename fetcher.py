@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import concurrent.futures
+import gzip
 import json
 import logging
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -24,10 +26,36 @@ UA = "Python/{}.{} github.com/eric15342335/roostoo-leaderboard".format(sys.versi
 
 COMMON_HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip",
     "User-Agent": UA,
     "VERSION": "52",
     "APP_LANGUAGE": "en",
 }
+
+_bw_lock = threading.Lock()
+_bw_stats = {}  # endpoint -> {"wire": int, "raw": int, "requests": int}
+
+
+def _endpoint(url):
+    return url.split("?")[0].rsplit("/", 1)[-1]
+
+
+def _read_response(resp):
+    wire = resp.read()
+    if resp.headers.get("Content-Encoding") == "gzip":
+        raw = gzip.decompress(wire)
+    else:
+        raw = wire
+    return wire, raw
+
+
+def _record(endpoint, wire_bytes, raw_bytes):
+    with _bw_lock:
+        s = _bw_stats.setdefault(endpoint, {"wire": 0, "raw": 0, "requests": 0})
+        s["wire"] += wire_bytes
+        s["raw"] += raw_bytes
+        s["requests"] += 1
+
 
 AUTH_HEADERS = {**COMMON_HEADERS, "RST-API-KEY": ""}
 
@@ -49,7 +77,9 @@ def _get(url, headers=None):
     req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            wire, raw = _read_response(resp)
+            _record(_endpoint(url), len(wire), len(raw))
+            return json.loads(raw.decode("utf-8"))
     except urllib.error.HTTPError as e:
         log.error("GET %s -> HTTP %d", url, e.code)
         return None
@@ -64,7 +94,9 @@ def _post(url, body):
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            wire, raw = _read_response(resp)
+            _record(_endpoint(url), len(wire), len(raw))
+            return json.loads(raw.decode("utf-8"))
     except urllib.error.HTTPError as e:
         log.error("POST %s -> HTTP %d", url, e.code)
         return None
@@ -141,6 +173,19 @@ def fetch_participant(entry, competition_id):
     return {"entry": entry, "userInfo": user_info, "portfolio": portfolio, "orders": orders}
 
 
+def _log_bandwidth_summary():
+    if not _bw_stats:
+        return
+    total_wire = sum(s["wire"] for s in _bw_stats.values())
+    total_raw = sum(s["raw"] for s in _bw_stats.values())
+    saved = total_raw - total_wire
+    pct = (saved / total_raw * 100) if total_raw else 0.0
+    log.info("Bandwidth summary: wire=%d raw=%d saved=%d (%.1f%%)", total_wire, total_raw, saved, pct)
+    for ep, s in sorted(_bw_stats.items(), key=lambda x: x[1]["raw"], reverse=True):
+        ep_pct = ((s["raw"] - s["wire"]) / s["raw"] * 100) if s["raw"] else 0.0
+        log.info("endpoint=%s requests=%d wire=%d raw=%d saved=%.1f%%", ep, s["requests"], s["wire"], s["raw"], ep_pct)
+
+
 def main():
     t0 = time.time()
     ttl = get_ttl_seconds()
@@ -211,6 +256,7 @@ def main():
         len(payload.encode("utf-8")),
         elapsed,
     )
+    _log_bandwidth_summary()
 
 
 if __name__ == "__main__":
