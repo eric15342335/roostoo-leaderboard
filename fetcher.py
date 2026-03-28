@@ -64,7 +64,7 @@ def _record(endpoint, wire_bytes, raw_bytes):
 def _request(req):
     url = req.full_url
     last_exc = None
-    for attempt in range(3):
+    for attempt in range(10):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 wire, raw = _read_response(resp)
@@ -76,7 +76,7 @@ def _request(req):
         except Exception as exc:
             last_exc = exc
             log.warning("%s %s failed (attempt %d/3), retrying...", req.get_method(), url, attempt + 1)
-            time.sleep(1)
+            time.sleep(2 ** attempt)
     log.error("%s %s failed after 3 attempts", req.get_method(), url, exc_info=last_exc)
     return None
 
