@@ -14,8 +14,10 @@ export interface LbEntry {
   sortino: number | null;
   sharpe: number | null;
   calmar: number | null;
-  compositeDataPoints: number;
-  compositeLatestDate: string | null;
+  meanReturn: number | null;
+  stdNegReturn: number | null;
+  maxDrawdown: number | null;
+  dailyReturns: Array<{ date: string; r: number }> | null;
 }
 
 export interface OrderRow {
@@ -123,8 +125,10 @@ export function transform({
       sortino: rawScores?.sortino ?? null,
       sharpe: rawScores?.sharpe ?? null,
       calmar: rawScores?.calmar ?? null,
-      compositeDataPoints: rawScores?.compositeDataPoints ?? 0,
-      compositeLatestDate: rawScores?.compositeLatestDate ?? null,
+      meanReturn: rawScores?.meanReturn ?? null,
+      stdNegReturn: rawScores?.stdNegReturn ?? null,
+      maxDrawdown: rawScores?.maxDrawdown ?? null,
+      dailyReturns: rawScores?.dailyReturns ?? null,
     });
 
     for (const cp of portfolio?.CoinProfit ?? []) {

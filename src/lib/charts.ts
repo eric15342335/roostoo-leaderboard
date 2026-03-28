@@ -41,7 +41,6 @@ async function plot(
 export async function chartLeaderboard(
   el: HTMLElement,
   rows: LbEntry[],
-  _latestDate?: string | null,
   activeRegion: string = "ALL"
 ) {
   const sorted = [...rows].sort((a, b) => a.profitPct - b.profitPct);
@@ -67,6 +66,15 @@ export async function chartLeaderboard(
   }
 
   const fmtScore = (v: number | null) => (v !== null ? String(parseFloat(v.toFixed(4))) : "N/A");
+  const fmtReturnPct = (v: number | null) =>
+    v !== null ? `${v >= 0 ? "+" : ""}${(v * 100).toFixed(4)}%` : "N/A";
+  const fmtDdPct = (v: number | null) => (v !== null ? `-${(v * 100).toFixed(4)}%` : "N/A");
+  const fmtDailyReturns = (r: LbEntry): string => {
+    if (!r.dailyReturns || r.dailyReturns.length === 0) return "N/A";
+    return r.dailyReturns
+      .map((d) => `${d.date}: ${d.r >= 0 ? "+" : ""}${(d.r * 100).toFixed(4)}%`)
+      .join("<br>");
+  };
 
   // Separate 0% teams and collapse them into one bar
   const zeroTeams = sorted.filter((r) => r.profitPct === 0);
@@ -90,15 +98,28 @@ export async function chartLeaderboard(
       `<br>Sortino: ${fmtScore(r.sortino)}` +
       `<br>Sharpe: ${fmtScore(r.sharpe)}` +
       `<br>Calmar: ${fmtScore(r.calmar)}`;
+    const returnsBlock =
+      `<br><br>Mean Daily Return: %{customdata[4]}` +
+      `<br>Downside Std: %{customdata[5]}` +
+      `<br>Max Drawdown: %{customdata[6]}` +
+      `<br><br>Daily Returns:<br>%{customdata[3]}`;
     return {
       label: r.team,
       val: r.profitPct,
       color: r.profitPct >= 0 ? GREEN : RED,
       text: pnlLabel + scoreLabel,
-      cd: [overallRank.get(r.team), r.country, r.rank],
+      cd: [
+        overallRank.get(r.team),
+        r.country,
+        r.rank,
+        fmtDailyReturns(r),
+        fmtReturnPct(r.meanReturn),
+        fmtReturnPct(r.stdNegReturn),
+        fmtDdPct(r.maxDrawdown),
+      ],
       htmpl: multiRegion
-        ? `<b>%{y}</b><br>P&L: %{x:.4f}%<br>Overall Rank: #%{customdata[0]}<br>%{customdata[1]} Rank: #%{customdata[2]}${scoreBlock}<extra></extra>`
-        : `<b>%{y}</b><br>P&L: %{x:.4f}%<br>%{customdata[1]} Rank: #%{customdata[2]}${scoreBlock}<extra></extra>`,
+        ? `<b>%{y}</b><br>P&L: %{x:.4f}%<br>Overall Rank: #%{customdata[0]}<br>%{customdata[1]} Rank: #%{customdata[2]}${scoreBlock}${returnsBlock}<extra></extra>`
+        : `<b>%{y}</b><br>P&L: %{x:.4f}%<br>%{customdata[1]} Rank: #%{customdata[2]}${scoreBlock}${returnsBlock}<extra></extra>`,
     };
   });
 

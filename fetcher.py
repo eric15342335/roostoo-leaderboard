@@ -81,7 +81,7 @@ def _request(req):
             return None
         except Exception as exc:
             last_exc = exc
-            log.warning("%s %s failed (attempt %d/3), retrying", req.get_method(), url, attempt + 1)
+            log.warning("%s %s failed (attempt %d), retrying", req.get_method(), url, attempt + 1)
             time.sleep(2**attempt)
     log.error("%s %s failed after 3 attempts", req.get_method(), url, exc_info=last_exc)
     return None
@@ -262,7 +262,6 @@ def _compute_team_scores(result, prices, all_dates):
     epsilon = 1e-8
 
     portfolio_values = []
-    composite_latest_date = None
     cash = initial_cash
     holdings = {}
     order_idx = 0
@@ -306,22 +305,22 @@ def _compute_team_scores(result, prices, all_dates):
         if portfolio_val is None:
             break
         portfolio_values.append(portfolio_val)
-        composite_latest_date = trading_date
 
     equity_curve = [initial_cash] + portfolio_values
     returns = [
         equity_curve[i] / equity_curve[i - 1] - 1 for i in range(1, len(equity_curve)) if equity_curve[i - 1] != 0
     ]
     n = len(returns)
-    latest_iso = composite_latest_date.isoformat() if composite_latest_date else None
 
     base = {
         "compositeScore": None,
         "sortino": None,
         "sharpe": None,
         "calmar": None,
-        "compositeDataPoints": n,
-        "compositeLatestDate": latest_iso,
+        "meanReturn": None,
+        "stdNegReturn": None,
+        "maxDrawdown": None,
+        "dailyReturns": [],
     }
     if n < 2:
         return base
@@ -347,12 +346,21 @@ def _compute_team_scores(result, prices, all_dates):
 
     composite = 0.4 * sortino + 0.3 * sharpe + 0.3 * calmar
 
+    daily_returns = [
+        {"date": all_dates[i].isoformat(), "r": round(returns[i], 6)}
+        for i in range(n)
+    ]
+
     return {
         **base,
         "compositeScore": round(composite, 6),
         "sortino": round(sortino, 6),
         "sharpe": round(sharpe, 6),
         "calmar": round(calmar, 6),
+        "meanReturn": round(mean_r, 6),
+        "stdNegReturn": round(std_down, 6),
+        "maxDrawdown": round(max_dd, 6),
+        "dailyReturns": daily_returns,
     }
 
 
@@ -440,9 +448,9 @@ def main():
         participant_result["scores"] = _compute_team_scores(participant_result, prices, all_dates)
 
     team_dates = [
-        participant_result["scores"]["compositeLatestDate"]
+        participant_result["scores"]["dailyReturns"][-1]["date"]
         for participant_result in results
-        if participant_result["scores"].get("compositeLatestDate")
+        if participant_result["scores"].get("dailyReturns")
     ]
     binance_latest_date = max(team_dates) if team_dates else None
 
