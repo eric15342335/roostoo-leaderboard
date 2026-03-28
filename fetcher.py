@@ -24,7 +24,7 @@ OUTPUT_PATH = "/var/www/roostoo-leaderboard/data.json"
 CONCURRENCY = 5
 TIME_BUFFER = 5 * 60
 
-COMPETITION_START_DATE = date(2026, 3, 22)
+COMPETITION_START_DATE = date(2026, 3, 21)
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
 BINANCE_VISION_BASE = "https://data.binance.vision"
 
@@ -200,7 +200,7 @@ def _fetch_raw(url):
     """Fetch raw bytes from a URL. Returns None on HTTP error (including 404)."""
     req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip", "User-Agent": USER_AGENT})
     last_exc = None
-    for attempt in range(3):
+    for attempt in range(10):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 wire, raw = _read_response(resp)
@@ -211,22 +211,22 @@ def _fetch_raw(url):
             return None
         except Exception as exc:
             last_exc = exc
-            log.warning("GET %s failed (attempt %d/3)", url, attempt + 1)
+            log.warning("GET %s failed (attempt %d)", url, attempt + 1)
             time.sleep(2**attempt)
     log.error("GET %s failed after retries", url, exc_info=last_exc)
     return None
 
 
-def _fetch_and_cache_kline(symbol, d):
-    """Return close price for symbol on date d, downloading and caching if needed."""
-    cache_path = os.path.join(CACHE_DIR, f"{symbol}-1d-{d:%Y-%m-%d}.csv")
+def _fetch_and_cache_kline(symbol, target_date):
+    """Return close price for symbol on target_date, downloading and caching if needed."""
+    cache_path = os.path.join(CACHE_DIR, f"{symbol}-1d-{target_date:%Y-%m-%d}.csv")
     if os.path.exists(cache_path):
         with open(cache_path, encoding="utf-8") as f:
             csv_text = f.read()
     else:
-        if d >= datetime.now(timezone.utc).date():
+        if target_date >= datetime.now(timezone.utc).date():
             return None
-        url = f"{BINANCE_VISION_BASE}/data/spot/daily/klines/{symbol}/1d/{symbol}-1d-{d:%Y-%m-%d}.zip"
+        url = f"{BINANCE_VISION_BASE}/data/spot/daily/klines/{symbol}/1d/{symbol}-1d-{target_date:%Y-%m-%d}.zip"
         raw = _fetch_raw(url)
         if raw is None:
             return None
@@ -234,7 +234,7 @@ def _fetch_and_cache_kline(symbol, d):
             with zipfile.ZipFile(io.BytesIO(raw)) as zf:
                 csv_text = zf.read(zf.namelist()[0]).decode("utf-8")
         except Exception:
-            log.exception("Failed to extract Binance Vision zip %s %s", symbol, d)
+            log.exception("Failed to extract Binance Vision zip %s %s", symbol, target_date)
             return None
         os.makedirs(CACHE_DIR, exist_ok=True)
         with open(cache_path, "w", encoding="utf-8") as f:
@@ -254,8 +254,8 @@ def _compute_team_scores(result, prices, all_dates):
     """Compute Sortino, Sharpe, Calmar, and Composite score for a single team."""
     orders = result.get("orders") or {}
     filled = sorted(
-        [o for o in (orders.get("OrderMatched") or []) if o.get("FilledAverPrice")],
-        key=lambda o: o["CreateTimestamp"],
+        [order for order in (orders.get("OrderMatched") or []) if order.get("FilledAverPrice")],
+        key=lambda order: order["FinishTimestamp"],
     )
 
     initial_cash = 1000000
@@ -267,20 +267,29 @@ def _compute_team_scores(result, prices, all_dates):
     holdings = {}
     order_idx = 0
 
-    for d in all_dates:
-        eod_ms = int((datetime(d.year, d.month, d.day, tzinfo=timezone.utc) + timedelta(days=1)).timestamp() * 1000) - 1
-        while order_idx < len(filled) and filled[order_idx]["CreateTimestamp"] <= eod_ms:
-            o = filled[order_idx]
-            notional = o["FilledQuantity"] * o["FilledAverPrice"]
-            commission = notional * o["CommissionPercent"]
-            sym = o["Pair"].replace("/USD", "USDT")
+    for trading_date in all_dates:
+        eod_ms = (
+            int(
+                (
+                    datetime(trading_date.year, trading_date.month, trading_date.day, tzinfo=timezone.utc)
+                    + timedelta(days=1)
+                ).timestamp()
+                * 1000
+            )
+            - 1
+        )
+        while order_idx < len(filled) and filled[order_idx]["FinishTimestamp"] <= eod_ms:
+            order = filled[order_idx]
+            notional = order["FilledQuantity"] * order["FilledAverPrice"]
+            commission = notional * order["CommissionPercent"]
+            sym = order["Pair"].replace("/USD", "USDT")
 
-            if o["Side"] == "BUY":
+            if order["Side"] == "BUY":
                 cash -= notional + commission
-                holdings[sym] = holdings.get(sym, 0.0) + o["FilledQuantity"]
+                holdings[sym] = holdings.get(sym, 0.0) + order["FilledQuantity"]
             else:
                 cash += notional - commission
-                holdings[sym] = holdings.get(sym, 0.0) - o["FilledQuantity"]
+                holdings[sym] = holdings.get(sym, 0.0) - order["FilledQuantity"]
 
             order_idx += 1
 
@@ -288,7 +297,7 @@ def _compute_team_scores(result, prices, all_dates):
         for sym, qty in holdings.items():
             if abs(qty) < epsilon:
                 continue
-            close = prices.get(sym, {}).get(d)
+            close = prices.get(sym, {}).get(trading_date)
             if close is None:
                 portfolio_val = None
                 break
@@ -297,10 +306,12 @@ def _compute_team_scores(result, prices, all_dates):
         if portfolio_val is None:
             break
         portfolio_values.append(portfolio_val)
-        composite_latest_date = d
+        composite_latest_date = trading_date
 
-    v = [initial_cash] + portfolio_values
-    returns = [v[i] / v[i - 1] - 1 for i in range(1, len(v)) if v[i - 1] != 0]
+    equity_curve = [initial_cash] + portfolio_values
+    returns = [
+        equity_curve[i] / equity_curve[i - 1] - 1 for i in range(1, len(equity_curve)) if equity_curve[i - 1] != 0
+    ]
     n = len(returns)
     latest_iso = composite_latest_date.isoformat() if composite_latest_date else None
 
@@ -319,13 +330,13 @@ def _compute_team_scores(result, prices, all_dates):
     std_r = (sum((r - mean_r) ** 2 for r in returns) / n) ** 0.5
 
     # Downside deviation: sqrt(sum(min(r,0)^2 for all r) / n), centered on zero
-    std_down = (sum(min(r, 0) ** 2 for r in returns) / n) ** 0.5
+    std_down = (sum(min(return_value, 0) ** 2 for return_value in returns) / n) ** 0.5
     sortino = mean_r / max(std_down, epsilon)
     sharpe = mean_r / max(std_r, epsilon)
 
-    peak = v[0]
+    peak = equity_curve[0]
     max_dd = 0.0
-    for val in v:
+    for val in equity_curve:
         if val > peak:
             peak = val
         if peak > 0:
@@ -364,7 +375,7 @@ def main():
 
     hk_entries = (hk_leaderboard or {}).get("PublicRank") or []
     sg_entries = (sg_leaderboard or {}).get("PublicRank") or []
-    all_tasks = [(e, HK_CPT_ID) for e in hk_entries] + [(e, SG_CPT_ID) for e in sg_entries]
+    all_tasks = [(entry, HK_CPT_ID) for entry in hk_entries] + [(entry, SG_CPT_ID) for entry in sg_entries]
     total = len(all_tasks)
 
     if total == 0:
@@ -392,40 +403,47 @@ def main():
                 log.exception("participant %d/%d failed (%s)", done, total, futures[future].get("UserCode", "?"))
 
     symbols = set()
-    for r in results:
-        for o in (r.get("orders") or {}).get("OrderMatched") or []:
-            if o.get("FilledAverPrice") and "/" in (o.get("Pair") or ""):
-                symbols.add(o["Pair"].replace("/USD", "USDT"))
-        for cp in (r.get("portfolio") or {}).get("CoinProfit") or []:
+    for participant_result in results:
+        for order in (participant_result.get("orders") or {}).get("OrderMatched") or []:
+            if order.get("FilledAverPrice") and "/" in (order.get("Pair") or ""):
+                symbols.add(order["Pair"].replace("/USD", "USDT"))
+        for cp in (participant_result.get("portfolio") or {}).get("CoinProfit") or []:
             if cp.get("CoinLeft", 0) > 0 and cp.get("Coin"):
                 symbols.add(cp["Coin"] + "USDT")
 
     today_utc = datetime.now(timezone.utc).date()
     all_dates = []
-    d = COMPETITION_START_DATE
-    while d < today_utc:
-        all_dates.append(d)
-        d += timedelta(days=1)
+    current_date = COMPETITION_START_DATE
+    while current_date < today_utc:
+        all_dates.append(current_date)
+        current_date += timedelta(days=1)
 
-    prices = {s: {} for s in symbols}
+    prices = {symbol: {} for symbol in symbols}
     if symbols and all_dates:
         log.info("Fetching Binance klines for %d symbol(s) * %d date(s)", len(symbols), len(all_dates))
-        tasks = [(s, dt) for s in symbols for dt in all_dates]
+        tasks = [(symbol, trade_date) for symbol in symbols for trade_date in all_dates]
         with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
-            futs = {pool.submit(_fetch_and_cache_kline, s, dt): (s, dt) for s, dt in tasks}
+            futs = {
+                pool.submit(_fetch_and_cache_kline, symbol, trade_date): (symbol, trade_date)
+                for symbol, trade_date in tasks
+            }
             for fut in concurrent.futures.as_completed(futs):
-                s, dt = futs[fut]
+                symbol, trade_date = futs[fut]
                 try:
                     close = fut.result()
                     if close is not None:
-                        prices[s][dt] = close
+                        prices[symbol][trade_date] = close
                 except Exception:
-                    log.exception("kline fetch failed %s %s", s, dt)
+                    log.exception("kline fetch failed %s %s", symbol, trade_date)
 
-    for r in results:
-        r["scores"] = _compute_team_scores(r, prices, all_dates)
+    for participant_result in results:
+        participant_result["scores"] = _compute_team_scores(participant_result, prices, all_dates)
 
-    team_dates = [r["scores"]["compositeLatestDate"] for r in results if r["scores"].get("compositeLatestDate")]
+    team_dates = [
+        participant_result["scores"]["compositeLatestDate"]
+        for participant_result in results
+        if participant_result["scores"].get("compositeLatestDate")
+    ]
     binance_latest_date = max(team_dates) if team_dates else None
 
     snapshot = {
@@ -440,8 +458,8 @@ def main():
     payload = json.dumps(snapshot, ensure_ascii=True, separators=(",", ":"))
     tmp = OUTPUT_PATH + ".tmp"
     os.makedirs(os.path.dirname(tmp), exist_ok=True)
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(payload)
+    with open(tmp, "w", encoding="utf-8") as output_file:
+        output_file.write(payload)
     os.replace(tmp, OUTPUT_PATH)
 
     elapsed = time.time() - start_time
