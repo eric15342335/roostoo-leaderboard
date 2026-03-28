@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cache, scrapedLabel } from "$lib/cache.svelte.js";
+  import { cache, scrapedLabel, compositeScoreLabel } from "$lib/cache.svelte.js";
   import RegionFilter from "$lib/RegionFilter.svelte";
   import { summaryStats, type LbEntry, type OrderRow } from "$lib/transform.js";
   import { GREEN, RED, BLUE, ORANGE } from "$lib/theme.js";
@@ -17,12 +17,15 @@
   } = $props();
 
   let label = $state("");
+  let compositeLabel = $state("");
   let stats = $derived(summaryStats(lbRows, orderRows));
 
   $effect(() => {
     label = scrapedLabel();
+    compositeLabel = compositeScoreLabel();
     const id = setInterval(() => {
       label = scrapedLabel();
+      compositeLabel = compositeScoreLabel();
     }, 1000);
     return () => clearInterval(id);
   });
@@ -75,7 +78,10 @@
     />
 
     <div class="right">
-      <span class="ttl">{label}</span>
+      <div class="ttl-wrap">
+        <span class="ttl">{label}</span>
+        {#if compositeLabel}<span class="ttl">{compositeLabel}</span>{/if}
+      </div>
       <a
         href="data.json"
         download
@@ -255,6 +261,12 @@
     color: var(--muted);
     white-space: nowrap;
   }
+  .ttl-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
   .gh-link {
     display: flex;
     align-items: center;
@@ -322,7 +334,7 @@
     header {
       padding: 6px 14px 0;
     }
-    .ttl {
+    .ttl-wrap {
       display: none;
     }
     .stats-row {

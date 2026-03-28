@@ -62,7 +62,7 @@
       <div class="grid-1">
         <PlotPanel
           chartFn={chartLeaderboard}
-          args={[filtered.lbRows]}
+          args={[filtered.lbRows, cache.binanceLatestDate, region]}
         />
       </div>
 

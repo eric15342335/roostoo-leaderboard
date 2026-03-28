@@ -38,29 +38,69 @@ async function plot(
   return Plotly;
 }
 
-export async function chartLeaderboard(el: HTMLElement, rows: LbEntry[]) {
+export async function chartLeaderboard(
+  el: HTMLElement,
+  rows: LbEntry[],
+  _latestDate?: string | null,
+  activeRegion: string = "ALL"
+) {
   const sorted = [...rows].sort((a, b) => a.profitPct - b.profitPct);
 
   const multiRegion = new Set(rows.map((r) => r.country)).size > 1;
   const overallRank = new Map(
     [...rows].sort((a, b) => b.profitPct - a.profitPct).map((r, i) => [r.team, i + 1])
   );
+  const byCompositeDesc = (a: LbEntry, b: LbEntry) =>
+    (b.compositeScore ?? Number.NEGATIVE_INFINITY) - (a.compositeScore ?? Number.NEGATIVE_INFINITY);
+  const compositeOverallRank = new Map(
+    [...rows]
+      .filter((r) => r.compositeScore !== null)
+      .sort(byCompositeDesc)
+      .map((r, i) => [r.team, i + 1])
+  );
+  const compositeRegionRank = new Map<string, number>();
+  for (const country of new Set(rows.map((r) => r.country))) {
+    const ranked = [...rows]
+      .filter((r) => r.country === country && r.compositeScore !== null)
+      .sort(byCompositeDesc);
+    ranked.forEach((r, i) => compositeRegionRank.set(r.team, i + 1));
+  }
+
+  const fmtScore = (v: number | null) => (v !== null ? String(parseFloat(v.toFixed(4))) : "N/A");
 
   // Separate 0% teams and collapse them into one bar
   const zeroTeams = sorted.filter((r) => r.profitPct === 0);
   const nonZero = sorted.filter((r) => r.profitPct !== 0);
 
   type BarRow = { label: string; val: number; color: string; text: string; cd: any; htmpl: string };
-  const barRows: BarRow[] = nonZero.map((r) => ({
-    label: r.team,
-    val: r.profitPct,
-    color: r.profitPct >= 0 ? GREEN : RED,
-    text: `${r.profitPct >= 0 ? "+" : ""}${parseFloat(r.profitPct.toFixed(4))}%`,
-    cd: [overallRank.get(r.team), r.country, r.rank, null],
-    htmpl: multiRegion
-      ? "<b>%{y}</b><br>P&L: %{x:.4f}%<br>Overall Rank: #%{customdata[0]}<br>%{customdata[1]} Rank: #%{customdata[2]}<extra></extra>"
-      : "<b>%{y}</b><br>P&L: %{x:.4f}%<br>%{customdata[1]} Rank: #%{customdata[2]}<extra></extra>",
-  }));
+  const barRows: BarRow[] = nonZero.map((r) => {
+    const pnlLabel = `${r.profitPct >= 0 ? "+" : ""}${parseFloat(r.profitPct.toFixed(4))}%`;
+    const scoreLabel = r.compositeScore !== null ? ` (${fmtScore(r.compositeScore)})` : "";
+    const compositeOverallLabel = compositeOverallRank.get(r.team);
+    const compositeRegionLabel = compositeRegionRank.get(r.team);
+    const showCompositeOverallRank = activeRegion === "ALL" && multiRegion;
+    const compositeRankBlock = showCompositeOverallRank
+      ? `<br>Overall Rank: ${compositeOverallLabel ? `#${compositeOverallLabel}` : "N/A"}` +
+        `<br>${r.country} Rank: ${compositeRegionLabel ? `#${compositeRegionLabel}` : "N/A"}`
+      : `<br>${r.country} Rank: ${compositeRegionLabel ? `#${compositeRegionLabel}` : "N/A"}`;
+    const scoreBlock =
+      `<br><br>For reference only, might not be accurate` +
+      `<br>Composite Score: ${fmtScore(r.compositeScore)}` +
+      compositeRankBlock +
+      `<br>Sortino: ${fmtScore(r.sortino)}` +
+      `<br>Sharpe: ${fmtScore(r.sharpe)}` +
+      `<br>Calmar: ${fmtScore(r.calmar)}`;
+    return {
+      label: r.team,
+      val: r.profitPct,
+      color: r.profitPct >= 0 ? GREEN : RED,
+      text: pnlLabel + scoreLabel,
+      cd: [overallRank.get(r.team), r.country, r.rank],
+      htmpl: multiRegion
+        ? `<b>%{y}</b><br>P&L: %{x:.4f}%<br>Overall Rank: #%{customdata[0]}<br>%{customdata[1]} Rank: #%{customdata[2]}${scoreBlock}<extra></extra>`
+        : `<b>%{y}</b><br>P&L: %{x:.4f}%<br>%{customdata[1]} Rank: #%{customdata[2]}${scoreBlock}<extra></extra>`,
+    };
+  });
 
   if (zeroTeams.length > 0) {
     const insertAt = barRows.findIndex((r) => r.val > 0);
@@ -73,11 +113,11 @@ export async function chartLeaderboard(el: HTMLElement, rows: LbEntry[]) {
       val: 0,
       color: MUTED,
       text: "0%",
-      cd: [null, null, null, teamList],
+      cd: [teamList],
       htmpl:
         zeroTeams.length === 1
           ? "<b>%{y}</b><br>P&L: 0%<extra></extra>"
-          : `<b>${zeroTeams.length} teams at 0%</b><br>%{customdata[3]}<extra></extra>`,
+          : `<b>${zeroTeams.length} teams at 0%</b><br>%{customdata[0]}<extra></extra>`,
     });
   }
 
@@ -103,6 +143,7 @@ export async function chartLeaderboard(el: HTMLElement, rows: LbEntry[]) {
         textfont: { size: 8, color: TEXT },
         customdata: barRows.map((r) => r.cd),
         hovertemplate: barRows.map((r) => r.htmpl),
+        hoverlabel: { align: "left" },
       },
     ],
     {

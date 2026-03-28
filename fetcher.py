@@ -2,6 +2,7 @@
 import concurrent.futures
 import gzip
 import http.client
+import io
 import json
 import logging
 import os
@@ -11,7 +12,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+import zipfile
+from datetime import date, datetime, timedelta, timezone
 
 HK_CPT_ID = 455
 SG_CPT_ID = 456
@@ -21,6 +23,10 @@ ORDER_FETCH_LIMIT = 1 << 20
 OUTPUT_PATH = "/var/www/roostoo-leaderboard/data.json"
 CONCURRENCY = 5
 TIME_BUFFER = 5 * 60
+
+COMPETITION_START_DATE = date(2026, 3, 22)
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
+BINANCE_VISION_BASE = "https://data.binance.vision"
 
 USER_AGENT = f"Python/{sys.version_info.major}.{sys.version_info.minor} github.com/eric15342335/roostoo-leaderboard"
 
@@ -75,8 +81,8 @@ def _request(req):
             return None
         except Exception as exc:
             last_exc = exc
-            log.warning("%s %s failed (attempt %d/3), retrying...", req.get_method(), url, attempt + 1)
-            time.sleep(2 ** attempt)
+            log.warning("%s %s failed (attempt %d/3), retrying", req.get_method(), url, attempt + 1)
+            time.sleep(2**attempt)
     log.error("%s %s failed after 3 attempts", req.get_method(), url, exc_info=last_exc)
     return None
 
@@ -190,6 +196,155 @@ def _log_bandwidth_summary():
         )
 
 
+def _fetch_raw(url):
+    """Fetch raw bytes from a URL. Returns None on HTTP error (including 404)."""
+    req = urllib.request.Request(url, headers={"Accept-Encoding": "gzip", "User-Agent": USER_AGENT})
+    last_exc = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                wire, raw = _read_response(resp)
+                _record("binance_kline", len(wire), len(raw))
+                return raw
+        except urllib.error.HTTPError as e:
+            log.warning("GET %s -> HTTP %d", url, e.code)
+            return None
+        except Exception as exc:
+            last_exc = exc
+            log.warning("GET %s failed (attempt %d/3)", url, attempt + 1)
+            time.sleep(2**attempt)
+    log.error("GET %s failed after retries", url, exc_info=last_exc)
+    return None
+
+
+def _fetch_and_cache_kline(symbol, d):
+    """Return close price for symbol on date d, downloading and caching if needed."""
+    cache_path = os.path.join(CACHE_DIR, f"{symbol}-1d-{d:%Y-%m-%d}.csv")
+    if os.path.exists(cache_path):
+        with open(cache_path, encoding="utf-8") as f:
+            csv_text = f.read()
+    else:
+        if d >= datetime.now(timezone.utc).date():
+            return None
+        url = f"{BINANCE_VISION_BASE}/data/spot/daily/klines/{symbol}/1d/{symbol}-1d-{d:%Y-%m-%d}.zip"
+        raw = _fetch_raw(url)
+        if raw is None:
+            return None
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                csv_text = zf.read(zf.namelist()[0]).decode("utf-8")
+        except Exception:
+            log.exception("Failed to extract Binance Vision zip %s %s", symbol, d)
+            return None
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(csv_text)
+
+    for line in csv_text.splitlines():
+        cols = line.strip().split(",")
+        if len(cols) > 4:
+            try:
+                return float(cols[4])
+            except ValueError:
+                pass
+    return None
+
+
+def _compute_team_scores(result, prices, all_dates):
+    """Compute Sortino, Sharpe, Calmar, and Composite score for a single team."""
+    orders = result.get("orders") or {}
+    filled = sorted(
+        [o for o in (orders.get("OrderMatched") or []) if o.get("FilledAverPrice")],
+        key=lambda o: o["CreateTimestamp"],
+    )
+
+    initial_cash = 1000000
+    epsilon = 1e-8
+
+    portfolio_values = []
+    composite_latest_date = None
+    cash = initial_cash
+    holdings = {}
+    order_idx = 0
+
+    for d in all_dates:
+        eod_ms = int((datetime(d.year, d.month, d.day, tzinfo=timezone.utc) + timedelta(days=1)).timestamp() * 1000) - 1
+        while order_idx < len(filled) and filled[order_idx]["CreateTimestamp"] <= eod_ms:
+            o = filled[order_idx]
+            notional = o["FilledQuantity"] * o["FilledAverPrice"]
+            commission = notional * o["CommissionPercent"]
+            sym = o["Pair"].replace("/USD", "USDT")
+
+            if o["Side"] == "BUY":
+                cash -= notional + commission
+                holdings[sym] = holdings.get(sym, 0.0) + o["FilledQuantity"]
+            else:
+                cash += notional - commission
+                holdings[sym] = holdings.get(sym, 0.0) - o["FilledQuantity"]
+
+            order_idx += 1
+
+        portfolio_val = cash
+        for sym, qty in holdings.items():
+            if abs(qty) < epsilon:
+                continue
+            close = prices.get(sym, {}).get(d)
+            if close is None:
+                portfolio_val = None
+                break
+            portfolio_val += qty * close
+
+        if portfolio_val is None:
+            break
+        portfolio_values.append(portfolio_val)
+        composite_latest_date = d
+
+    v = [initial_cash] + portfolio_values
+    returns = [v[i] / v[i - 1] - 1 for i in range(1, len(v)) if v[i - 1] != 0]
+    n = len(returns)
+    latest_iso = composite_latest_date.isoformat() if composite_latest_date else None
+
+    base = {
+        "compositeScore": None,
+        "sortino": None,
+        "sharpe": None,
+        "calmar": None,
+        "compositeDataPoints": n,
+        "compositeLatestDate": latest_iso,
+    }
+    if n < 2:
+        return base
+
+    mean_r = sum(returns) / n
+    std_r = (sum((r - mean_r) ** 2 for r in returns) / n) ** 0.5
+
+    # Downside deviation: sqrt(sum(min(r,0)^2 for all r) / n), centered on zero
+    std_down = (sum(min(r, 0) ** 2 for r in returns) / n) ** 0.5
+    sortino = mean_r / max(std_down, epsilon)
+    sharpe = mean_r / max(std_r, epsilon)
+
+    peak = v[0]
+    max_dd = 0.0
+    for val in v:
+        if val > peak:
+            peak = val
+        if peak > 0:
+            dd = (peak - val) / peak
+            if dd > max_dd:
+                max_dd = dd
+    calmar = mean_r / max(max_dd, epsilon)
+
+    composite = 0.4 * sortino + 0.3 * sharpe + 0.3 * calmar
+
+    return {
+        **base,
+        "compositeScore": round(composite, 6),
+        "sortino": round(sortino, 6),
+        "sharpe": round(sharpe, 6),
+        "calmar": round(calmar, 6),
+    }
+
+
 def main():
     start_time = time.time()
     ttl = get_ttl_seconds()
@@ -217,7 +372,7 @@ def main():
         sys.exit(1)
 
     log.info(
-        "Fetching %d participants (HK=%d, SG=%d) with concurrency=%d...",
+        "Fetching %d participants (HK=%d, SG=%d) with concurrency=%d",
         total,
         len(hk_entries),
         len(sg_entries),
@@ -236,12 +391,50 @@ def main():
             except Exception:
                 log.exception("participant %d/%d failed (%s)", done, total, futures[future].get("UserCode", "?"))
 
+    symbols = set()
+    for r in results:
+        for o in (r.get("orders") or {}).get("OrderMatched") or []:
+            if o.get("FilledAverPrice") and "/" in (o.get("Pair") or ""):
+                symbols.add(o["Pair"].replace("/USD", "USDT"))
+        for cp in (r.get("portfolio") or {}).get("CoinProfit") or []:
+            if cp.get("CoinLeft", 0) > 0 and cp.get("Coin"):
+                symbols.add(cp["Coin"] + "USDT")
+
+    today_utc = datetime.now(timezone.utc).date()
+    all_dates = []
+    d = COMPETITION_START_DATE
+    while d < today_utc:
+        all_dates.append(d)
+        d += timedelta(days=1)
+
+    prices = {s: {} for s in symbols}
+    if symbols and all_dates:
+        log.info("Fetching Binance klines for %d symbol(s) * %d date(s)", len(symbols), len(all_dates))
+        tasks = [(s, dt) for s in symbols for dt in all_dates]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
+            futs = {pool.submit(_fetch_and_cache_kline, s, dt): (s, dt) for s, dt in tasks}
+            for fut in concurrent.futures.as_completed(futs):
+                s, dt = futs[fut]
+                try:
+                    close = fut.result()
+                    if close is not None:
+                        prices[s][dt] = close
+                except Exception:
+                    log.exception("kline fetch failed %s %s", s, dt)
+
+    for r in results:
+        r["scores"] = _compute_team_scores(r, prices, all_dates)
+
+    team_dates = [r["scores"]["compositeLatestDate"] for r in results if r["scores"].get("compositeLatestDate")]
+    binance_latest_date = max(team_dates) if team_dates else None
+
     snapshot = {
         "fetchedAt": int(time.time() * 1000),
         "compRaw": competition_info or {"hk": None, "sg": None},
         "hkLbRaw": hk_leaderboard,
         "sgLbRaw": sg_leaderboard,
         "results": results,
+        "binanceLatestDate": binance_latest_date,
     }
 
     payload = json.dumps(snapshot, ensure_ascii=True, separators=(",", ":"))

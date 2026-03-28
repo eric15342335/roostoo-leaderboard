@@ -4,4 +4,6 @@ build/
 python/
 .claude/
 static/
-.ruff-cache/
+.ruff_cache/
+cache/
+.venv/

@@ -6,11 +6,13 @@ export const cache = $state<{
   fetchedAt: number;
   loading: boolean;
   error: string | null;
+  binanceLatestDate: string | null;
 }>({
   data: null,
   fetchedAt: 0,
   loading: false,
   error: null,
+  binanceLatestDate: null,
 });
 
 export async function refresh() {
@@ -25,6 +27,7 @@ export async function refresh() {
     const data = transform(raw);
     cache.data = data;
     cache.fetchedAt = raw.fetchedAt ?? Date.now();
+    cache.binanceLatestDate = raw.binanceLatestDate ?? null;
   } catch (e) {
     cache.error = e instanceof Error ? e.message : String(e);
   } finally {
@@ -50,4 +53,16 @@ export function scrapedLabel() {
     hour12: false,
   }).format(cache.fetchedAt);
   return `Scraped at ${datetime} ${tzLabel} (${ago})`;
+}
+
+export function compositeScoreLabel(): string {
+  if (!cache.binanceLatestDate) return "";
+  const [y, m, day] = cache.binanceLatestDate.split("-").map(Number);
+  const formatted = new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(Date.UTC(y, m - 1, day));
+  return `Composite score last updated: ${formatted} (UTC)`;
 }

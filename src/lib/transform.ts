@@ -10,6 +10,12 @@ export interface LbEntry {
   buyCount: number;
   sellCount: number;
   cancelledCount: number;
+  compositeScore: number | null;
+  sortino: number | null;
+  sharpe: number | null;
+  calmar: number | null;
+  compositeDataPoints: number;
+  compositeLatestDate: string | null;
 }
 
 export interface OrderRow {
@@ -47,15 +53,23 @@ function scaleProfitPct(v: number) {
 }
 
 /**
- * @param {{ compRaw: any, results: any[] }} raw
+ * @param {{ compRaw: any, results: any[], binanceLatestDate?: string | null }} raw
  * @returns {{ lbRows: LbEntry[], orderRows: OrderRow[], coinRows: CoinProfitRow[], meta: any }}
  */
-export function transform({ compRaw, results }: { compRaw: any; results: any[] }) {
+export function transform({
+  compRaw,
+  results,
+  binanceLatestDate,
+}: {
+  compRaw: any;
+  results: any[];
+  binanceLatestDate?: string | null;
+}) {
   const lbRows: LbEntry[] = [];
   const orderRows: OrderRow[] = [];
   const coinRows: CoinProfitRow[] = [];
 
-  for (const { entry, portfolio, orders } of results) {
+  for (const { entry, portfolio, orders, scores: rawScores } of results) {
     const rank = entry.Rank;
     const team = teamLabel(entry.DisplayName);
     const country = entry.CountryCode;
@@ -105,6 +119,12 @@ export function transform({ compRaw, results }: { compRaw: any; results: any[] }
       buyCount,
       sellCount,
       cancelledCount,
+      compositeScore: rawScores?.compositeScore ?? null,
+      sortino: rawScores?.sortino ?? null,
+      sharpe: rawScores?.sharpe ?? null,
+      calmar: rawScores?.calmar ?? null,
+      compositeDataPoints: rawScores?.compositeDataPoints ?? 0,
+      compositeLatestDate: rawScores?.compositeLatestDate ?? null,
     });
 
     for (const cp of portfolio?.CoinProfit ?? []) {
@@ -132,6 +152,7 @@ export function transform({ compRaw, results }: { compRaw: any; results: any[] }
     hkCompetitionName: hkName,
     sgCompetitionName: sgName,
     participantCount: lbRows.length,
+    binanceLatestDate: binanceLatestDate ?? null,
   };
 
   return { lbRows, orderRows, coinRows, meta };
